@@ -1,0 +1,24 @@
+/* Device switcher */
+.dv-float { position: fixed; right: 20px; bottom: 20px; z-index: 40; font-family: Inter, sans-serif; }
+.dv-toggle { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px 0 14px; border: 1px solid #e6e7ef; border-radius: 999px; background: #fff; color: #1e2939; font: 600 14px/1 Inter, sans-serif; box-shadow: 0 12px 40px rgba(30,41,57,.16); cursor: pointer; }
+.dv-toggle:hover { color: #595cff; }
+.dv-menu { position: absolute; right: 0; bottom: 54px; width: 260px; background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(30,41,57,.2); padding: 10px; display: none; flex-direction: column; gap: 2px; }
+.dv-float.open .dv-menu { display: flex; }
+.dv-menu b { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #6a7282; padding: 6px 10px 8px; }
+.dv-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 0; border-radius: 10px; background: none; color: #1e2939; font: 500 14px/1.2 Inter, sans-serif; cursor: pointer; text-align: left; }
+.dv-btn:hover { background: #f5f6ff; }
+.dv-btn.on { background: #ebeeff; color: #595cff; font-weight: 600; }
+@media (max-width: 767px) { .dv-float { bottom: 88px; right: 12px; } .dv-toggle span { display: none; } .dv-toggle { width: 44px; padding: 0; justify-content: center; } }
+
+/* Preview frame mode */
+.dv-body { margin: 0; height: 100vh; display: flex; flex-direction: column; background: #e9e8f1; font-family: Inter, sans-serif; overflow: hidden; }
+.dv-bar { flex: none; display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: #fff; border-bottom: 1px solid #e6e7ef; overflow-x: auto; }
+.dv-seg { display: inline-flex; gap: 4px; background: #ebeeff; padding: 4px; border-radius: 999px; }
+.dv-seg .dv-btn { width: auto; border-radius: 999px; padding: 8px 14px; gap: 8px; white-space: nowrap; font-size: 13px; }
+.dv-seg .dv-btn.on { background: #595cff; color: #fff; }
+.dv-seg .dv-btn:not(.on):hover { background: #fff; }
+.dv-size { margin-left: auto; font-size: 13px; color: #6a7282; white-space: nowrap; }
+.dv-stage { flex: 1; min-height: 0; display: grid; place-items: center; overflow: hidden; }
+.dv-frame { position: relative; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 10px #1e2939, 0 24px 60px rgba(30,41,57,.35); background: #fff; }
+.dv-frame iframe { border: 0; display: block; transform-origin: 0 0; background: #f5f4f9; }
+@media (max-width: 900px) { .dv-seg .dv-btn span { display: none; } }
