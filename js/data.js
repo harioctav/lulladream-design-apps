@@ -1,17 +1,17 @@
 /* LullaDream demo catalogue — local demo data only (never talks to the real LullaDream API) */
 window.LD_DATA = (function () {
   var IMG = {
-    logo: "assets/lulladream-logo.png", mark: "assets/lulladream-mark.png", orb: "assets/dream-orb.png", avatar: "assets/tiger-avatar.png", moon: "assets/moon.png", fairy: "assets/fairy.png",
+    logo: "assets/lulladream-logo.png", mark: "assets/lulladream-mark.png", orb: "assets/dream-orb.png", avatar: "assets/tiger-avatar.png", moon: "assets/moon.png", fairy: "assets/fairy.png", v_wanda: "assets/voice-wanda.png", v_rudy: "assets/voice-rudy.png", v_yasmin: "assets/voice-yasmin.png",
     aladdin: "assets/aladdin.jpg", alibaba: "assets/ali-baba.jpg", anansi: "assets/anansi.jpg", beauty: "assets/beauty-beast.jpg",
     jessica: "assets/jessica.jpg", cinderella: "assets/cinderella.jpg", hansel: "assets/hansel-gretel.jpg"
   };
   var COVERS = ["jessica", "aladdin", "alibaba", "anansi", "beauty", "cinderella", "hansel"];
   var CATS = ["Magic & Transformations", "Bravery & Adventure", "Clever Heroes", "Wisdom & Morality"];
-  var COUNTRIES = ["Middle East", "West Africa", "France", "Germany", "LullaDream Original"];
+  var COUNTRIES = ["Arabia", "France", "Germany", "Ghana", "Indonesia"];
   var AGES = ["2–3", "4–5", "6–8", "9–12"];
 
   var CATALOG = [
-    { id: "aladdin", t: "Aladdin and the Magic Lamp", c: "Magic & Transformations", m: 4, country: "Middle East", age: "6–8", cover: "aladdin", pop: 98,
+    { id: "aladdin", t: "Aladdin and the Magic Lamp", c: "Magic & Transformations", m: 4, country: "Arabia", age: "6–8", cover: "aladdin", pop: 98,
       text: [
         "Long ago, in a city of golden domes and busy markets, there lived a kind boy named Aladdin who dreamed of seeing the stars from the very top of the palace.",
         "One evening a stranger asked him to fetch an old lamp from a cave beneath the desert sand. Inside, jewels glittered like fireflies, but Aladdin only picked up the dusty lamp.",
@@ -19,7 +19,7 @@ window.LD_DATA = (function () {
         "Aladdin thought for a long while. He wished for bread for every family in the market, and for the genie to be free. The genie laughed a laugh as warm as summer.",
         "That night, Aladdin climbed to the palace roof with his new friend, and together they counted the stars until his eyes grew heavy. Goodnight, little dreamer."
       ] },
-    { id: "alibaba", t: "Ali Baba and the Forty Thieves", c: "Bravery & Adventure", m: 5, country: "Middle East", age: "6–8", cover: "alibaba", pop: 87,
+    { id: "alibaba", t: "Ali Baba and the Forty Thieves", c: "Bravery & Adventure", m: 5, country: "Arabia", age: "6–8", cover: "alibaba", pop: 87,
       text: [
         "Ali Baba was a woodcutter who loved the quiet of the forest and the sound of his donkey's bells.",
         "One day he hid behind a rock and watched forty thieves stop at a mountain. \"Open, Sesame!\" their leader called, and the stone rolled aside.",
@@ -27,7 +27,7 @@ window.LD_DATA = (function () {
         "Clever Morgiana, his friend, kept watch when the thieves came looking. With quick thinking and a brave heart, she kept everyone safe.",
         "And so the village shared their good fortune, and every night the forest hummed a calm, sleepy song. Sweet dreams."
       ] },
-    { id: "anansi", t: "Anansi the Spider", c: "Clever Heroes", m: 4, country: "West Africa", age: "4–5", cover: "anansi", pop: 76,
+    { id: "anansi", t: "Anansi the Spider", c: "Clever Heroes", m: 4, country: "Ghana", age: "4–5", cover: "anansi", pop: 76,
       text: [
         "High in a baobab tree lived Anansi, a little spider with a very big idea: he wanted all the stories in the world.",
         "The Sky God kept the stories in a golden box and said, \"Bring me the hornets, the python and the leopard, and the stories are yours.\"",
@@ -43,7 +43,7 @@ window.LD_DATA = (function () {
         "When the last petal of the enchanted rose began to fall, Belle said, \"You are my friend.\" Light filled the castle, and the spell melted away.",
         "Kindness, Belle learned, can see what eyes cannot. Rest now, and dream of rose gardens."
       ] },
-    { id: "jessica", t: "Jessica's Brave Adventure", c: "Wisdom & Morality", m: 4, country: "LullaDream Original", age: "4–5", cover: "jessica", pop: 70,
+    { id: "jessica", t: "Jessica's Brave Adventure", c: "Wisdom & Morality", m: 4, country: "Indonesia", age: "4–5", cover: "jessica", pop: 70,
       text: [
         "Jessica had a red scarf, a small backpack and one big question: what is on the other side of the hill?",
         "On the way she met a tortoise who was stuck in the mud. Jessica stopped, even though she was in a hurry, and helped him out.",
@@ -72,7 +72,7 @@ window.LD_DATA = (function () {
   var STYLES = [["calm", "Calm & Soothing", "🌙"], ["funny", "Funny", "😂"], ["adventurous", "Adventurous", "🗺️"], ["magical", "Magical", "✨"], ["educational", "Educational", "📚"], ["rhyming", "Rhyming", "🎵"]];
   var TYPES = [["fairy", "Fairy Tale", "🧚"], ["fable", "Fable", "🦊"], ["adventure", "Adventure", "🏔️"], ["bedtime", "Bedtime", "🛏️"], ["space", "Space", "🚀"], ["mystery", "Mystery", "🔍"]];
   var DURS = [3, 5, 8, 10];
-  var VOICES_BUILTIN = [["wanda", "Wanda"], ["leo", "Leo"], ["nana", "Nana"]];
+  var VOICES_BUILTIN = [["wanda", "Wanda"], ["rudy", "Rudy"], ["yasmin", "Yasmin"]];
   var SOUNDS = ["Off", "Rain", "Ocean", "Forest", "Lullaby"];
   var TIMERS = [0, 5, 10, 15, 30];
   var IDEAS = ["A brave fox explores a hidden forest", "A dragon who is afraid of the dark", "A trip to the moon in a paper boat", "A little cloud who wants to be a rainbow"];

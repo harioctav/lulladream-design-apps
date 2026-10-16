@@ -115,7 +115,7 @@
   function allStories() { return D.CATALOG.concat(st.mine.filter(function (m) { return m.public; }).map(fromMine)); }
   function isFav(id) { return st.favs.indexOf(id) > -1; }
   function pct(s) { return Math.min(100, Math.round(((st.progress[s.id] || 0) / (s.m * 60)) * 100)); }
-  function voiceName(id) {
+  function voiceNameOld(id) {
     var b = D.VOICES_BUILTIN.filter(function (v) { return v[0] === id; })[0]; if (b) return b[1];
     var u = st.voices.filter(function (v) { return v.id === id; })[0]; return u ? u.name : "Wanda";
   }
@@ -227,8 +227,9 @@
       case "help": v = vHelp(p[1]); break;
       case "soon": v = vSoon(p[1]); break;
       case "topup": v = vTopup(); break;
+      case "select-voice": v = vSelectVoice(r.q); break;
       case "welcome": case "login": case "signup": case "forgot": case "otp": case "reset": v = vAuth(name); break;
-      default: v = vNotFound();
+      default: v = (routeExtra(name) || vNotFound)();
     }
     if (v.bare) { app.innerHTML = v.html; }
     else {
@@ -245,7 +246,7 @@
 
   /* ================= Views ================= */
   var homeCat = "All";
-  function vHome() {
+  function vHomeOld() {
     var all = D.CATALOG;
     var contList = st.recent.map(function (r) { return getStory(r.id); }).filter(function (s) { return s && pct(s) > 0 && pct(s) < 100; }).slice(0, 3);
     var favCats = st.favs.map(getStory).filter(Boolean).map(function (s) { return s.c; });
@@ -526,7 +527,7 @@
       return '<div class="ld-li' + (st.voice === v.id ? " is-on" : "") + '" style="cursor:default"><span class="ic">' + ic("mic", 18) + '</span><span class="tx">' + esc(v.name) + (st.voice === v.id ? ' <span class="ld-badge">Default</span>' : "") + "<small>Recorded " + ago(v.at) + (v.audio ? " · with audio" : "") + '</small></span><span class="acts">' +
         '<button class="ld-iconbtn" data-act="vplay" data-id="' + v.id + '" title="Preview">' + ic("play", 14) + '</button><button class="ld-iconbtn" data-act="vsel" data-id="' + v.id + '" title="Use as default">' + ic("check", 16) + '</button><button class="ld-iconbtn" data-act="vren" data-id="' + v.id + '" title="Rename">' + ic("edit", 16) + '</button><button class="ld-iconbtn" style="color:var(--danger-600)" data-act="vdel" data-id="' + v.id + '" title="Delete">' + ic("trash", 16) + "</button></span></div>";
     }).join("") + "</div></section>" : empty("mic", "No recordings yet", "Add a voice recording so stories can be told in your own voice.", '<button class="ld-btn primary" data-act="vnew">' + ic("plus", 18) + "New Voice</button>");
-    h += '<section class="ld-section">' + head("LullaDream voices") + '<div class="ld-voices">' + D.VOICES_BUILTIN.map(function (v) { return '<div class="ld-voice' + (st.voice === v[0] ? " on" : "") + '" data-act="vsel" data-id="' + v[0] + '"><span class="v">' + ic("user", 28) + "</span>" + v[1] + '<span class="pv" data-act="vplay" data-id="' + v[0] + '">' + ic("play", 10) + "Preview</span></div>"; }).join("") + "</div></section>";
+    h += '<section class="ld-section">' + head("LullaDream voices") + '<div class="ld-voices">' + D.VOICES_BUILTIN.map(function (v) { return '<div class="ld-voice' + (st.voice === v[0] ? " on" : "") + '" data-act="vsel" data-id="' + v[0] + '"><span class="v" style="overflow:hidden"><img src="' + IMG["v_" + v[0]] + '" alt="" style="width:100%;height:100%;object-fit:cover"></span>' + v[1] + '<span class="pv" data-act="vplay" data-id="' + v[0] + '">' + ic("play", 10) + "Preview</span></div>"; }).join("") + "</div></section>";
     return { active: "voices", title: T("voices"), back: true, search: false, html: h };
   }
   function vFavorites() {
@@ -585,7 +586,7 @@
   var PACKS = [[100, 2.52], [300, 5.32], [500, 9.80], [800, 15.40], [1000, 1.00], [1500, 0.59]];
   var topSel = 500;
   function usd(n) { return "USD " + n.toFixed(2); }
-  function vTopup() {
+  function vTopupOld() {
     var p = PACKS.filter(function (x) { return x[0] === topSel; })[0];
     var h = '<section class="tu2"><div class="tu2-main">' +
       '<div class="tu2-card"><small>Your Coins</small><strong><i class="coin"></i>' + st.coins + ' Coins<button data-act="refreshcoins" aria-label="Refresh">' + ic("refresh", 22) + '</button></strong><em>' + planName(st.user.plan) + "</em></div>" +
@@ -821,6 +822,21 @@
     else toast("Preview: " + voiceName(id));
   }
 
+
+  /* ---- Select Voice page (app design, responsive) ---- */
+  var svPick = null, svFor = "home";
+  function vSelectVoice(q) {
+    if (q.get("for")) svFor = q.get("for");
+    function item(id, name, img) {
+      return '<button class="sv-item' + (svPick === id ? " is-on" : "") + '" data-act="svpick" data-v="' + id + '"><span class="sv-av">' + (img ? '<img src="' + img + '" alt="">' : ic("user", 34)) + '<span class="sv-ck">' + ic("check", 14) + "</span></span><b>" + esc(name) + "</b></button>";
+    }
+    var h = '<section class="svp"><header class="sv-head"><h1>Select Voice</h1><button class="sv-x" data-act="svclose" aria-label="Close">' + ic("x", 20) + "</button></header>" +
+      '<div class="sv-body"><h3>With My Voice</h3><div class="sv-grid"><button class="sv-item sv-new" data-act="vnew"><span class="sv-av">' + ic("plus", 32) + '<span class="sv-cost"><i></i>100</span></span><b>New Voice</b></button>' +
+      st.voices.map(function (v) { return item(v.id, v.name, null); }).join("") + "</div>" +
+      "<h3>LullaDream's Voices</h3><div class=\"sv-grid\">" + D.VOICES_BUILTIN.map(function (v) { return item(v[0], v[1], IMG["v_" + v[0]]); }).join("") + "</div></div>" +
+      '<footer class="sv-foot"><button class="ld-btn primary lg block pill" data-act="svuse"' + (svPick ? "" : " disabled") + ">Use Voice</button></footer></section>";
+    return { active: svFor.indexOf("story/") === 0 ? "library" : "profile", title: "", back: false, search: false, html: h, doc: "Select Voice" };
+  }
   /* ================= Actions ================= */
   var A = {
     eye: function (el) { var i = el.parentNode.querySelector("input"); var show = i.type === "password"; i.type = show ? "text" : "password"; el.innerHTML = ic(show ? "eyeoff" : "eye", 20); el.setAttribute("aria-label", show ? "Hide password" : "Show password"); },
@@ -857,9 +873,11 @@
       else if (navigator.share) navigator.share({ title: s.t, url: link }).catch(function () { });
       else copy();
     },
-    pvoice: function () {
-      choose("Narrator voice", D.VOICES_BUILTIN.map(function (v) { return [v[0], v[1], "LullaDream voice"]; }).concat(st.voices.map(function (v) { return [v.id, v.name, "Your recording"]; })), st.voice, function (v) { st.voice = v; save(); keepScroll(render); toast("Narrator: " + voiceName(v)); });
-    },
+    pvoice: function () { svPick = null; go("select-voice?for=" + encodeURIComponent("story/" + pl.id)); },
+    svpick: function (el) { svPick = el.getAttribute("data-v"); $$(".svp .sv-item").forEach(function (x) { x.classList.toggle("is-on", x === el); }); $('[data-act="svuse"]').disabled = false; },
+    svuse: function () { if (!svPick) return; st.voice = svPick; save(); toast("Narrator: " + voiceName(svPick)); svPick = null; go(svFor); },
+    svclose: function () { svPick = null; go(svFor); },
+
     psound: function () { go("soon/sounds"); },
     ptimer: function () { choose("Sleep timer", D.TIMERS.map(function (t) { return [t, t ? t + " minutes" : "Off"]; }), st.timer, function (v) { st.timer = +v; st.timerEnd = st.timer && pl.playing ? Date.now() + st.timer * 60e3 : 0; save(); updPlayer(); toast(st.timer ? "Sleep timer set to " + st.timer + " min" : "Sleep timer off"); }); },
     // generate
@@ -932,6 +950,762 @@
     nall: function () { st.notifs.forEach(function (n) { n.read = true; }); save(); render(); },
     nclear: function () { var old = st.notifs.slice(); st.notifs = []; save(); render(); toast("Notifications cleared", function () { st.notifs = old; save(); render(); }); }
   };
+
+  /* ======================================================================
+     FINAL — screens aligned with the LullaDream app recording, made responsive
+     (later declarations override the earlier prototype versions above)
+     ====================================================================== */
+  Object.assign(TX.ID, { mystory: "Cerita Saya", library: "Perpustakaan", home: "Beranda", profile: "Profil" });
+  var PTX = {
+    EN: { coins: "Your Coins", coinsW: "Coins", topup: "Top Up", info: "User Information", help: "Help & Support", settings: "Settings Profile", voices: "Voice Recordings", subs: "Manage Subscription Plans", lang: "Language", recent: "Recent Activity", fav: "Favorites", faq: "FAQs", support: "Customer Support", trouble: "Troubleshooting", terms: "Terms & Conditions", privacy: "Privacy Policy", del: "Delete Account", signout: "Sign Out" },
+    ID: { coins: "Koin Anda", coinsW: "Koin", topup: "Isi Ulang", info: "Informasi Pengguna", help: "Bantuan & Dukungan", settings: "Pengaturan Profil", voices: "Rekaman Suara", subs: "Kelola Paket Berlangganan", lang: "Bahasa", recent: "Aktivitas Terbaru", fav: "Favorit", faq: "FAQ", support: "Layanan Pelanggan", trouble: "Pemecahan Masalah", terms: "Syarat & Ketentuan", privacy: "Kebijakan Privasi", del: "Hapus Akun", signout: "Keluar" }
+  };
+  function PT(k) { return (PTX[st.user.lang] || PTX.EN)[k] || PTX.EN[k]; }
+  P.flag = '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>';
+  P.camera = '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>';
+  P.dots = '<circle cx="12" cy="5" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="19" r="1.6" fill="currentColor"/>';
+  P.eq = '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>';
+  P.expand = '<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>';
+  P.speaker = '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/>';
+  P.cal = '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>';
+  P.wave = '<path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 11v2"/>';
+  P.link = '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>';
+  P.more = '<circle cx="12" cy="12" r="9"/><circle cx="8" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="16" cy="12" r="1" fill="currentColor"/>';
+  P.alert = '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>';
+  P.music2 = '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>';
+  P.lockc = '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>';
+  P.mute = '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l4 6M21 9l-4 6"/>';
+  P.monitor = '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>';
+
+  function coinStack(s) { s = s || 64; return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 64 64" aria-hidden="true"><g stroke="#c26a00" stroke-width="2"><ellipse cx="30" cy="46" rx="20" ry="7" fill="#f7a823"/><rect x="10" y="38" width="40" height="8" fill="#f7a823" stroke="none"/><ellipse cx="30" cy="38" rx="20" ry="7" fill="#ffc53d"/><ellipse cx="34" cy="28" rx="20" ry="7" fill="#f7a823"/><rect x="14" y="20" width="40" height="8" fill="#f7a823" stroke="none"/><ellipse cx="34" cy="20" rx="20" ry="7" fill="#ffd54f"/></g><path d="M52 6l1.5 3 3 1.5-3 1.5L52 15l-1.5-3-3-1.5 3-1.5zM8 22l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" fill="#ffb300"/></svg>'; }
+  function coinIco(s) { s = s || 22; return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="11" cy="16" rx="8" ry="3" fill="#f7a823" stroke="#c26a00"/><ellipse cx="11" cy="13" rx="8" ry="3" fill="#ffc53d" stroke="#c26a00"/><ellipse cx="13" cy="9" rx="8" ry="3" fill="#ffd54f" stroke="#c26a00"/></svg>'; }
+
+  /* ---------- shared bits ---------- */
+  function subhead(title, back) { return '<section class="subhead">' + (back === false ? "" : '<button class="sh-back" data-act="back" aria-label="Back">' + ic("back", 24) + "</button>") + "<h1>" + title + "</h1></section>"; }
+  function dialog(o) {
+    var art = o.art || '<div class="ic' + (o.danger ? " danger" : "") + '">' + ic(o.icon || "help", 30) + "</div>";
+    var el = overlay('<div class="dlg dlg2" role="dialog" aria-modal="true">' + art + "<h3>" + o.title + "</h3>" + (o.text ? "<p>" + o.text + "</p>" : "") + (o.body || "") +
+      '<div class="btns"><button class="ld-btn pill cancel2" data-x="cancel">' + (o.cancel || "Cancel") + '</button><button class="ld-btn pill ' + (o.danger ? "danger" : "primary") + '" data-x="ok">' + (o.ok || "Continue") + "</button></div></div>");
+    el.querySelector('[data-x="cancel"]').onclick = closeOverlay;
+    el.querySelector('[data-x="ok"]').onclick = function () { if (o.onOk && o.onOk(el) === false) return; if (ovEl === el) closeOverlay(); };
+    var inp = el.querySelector("input"); if (inp) inp.addEventListener("keydown", function (e) { if (e.key === "Enter") el.querySelector('[data-x="ok"]').click(); });
+    return el;
+  }
+  function toast(msg, undo) {
+    if (!toastBox) { toastBox = document.createElement("div"); toastBox.className = "toasts ld"; toastBox.style.minHeight = "0"; toastBox.style.background = "none"; document.body.appendChild(toastBox); }
+    var t = document.createElement("div"); t.className = "ld-toast t2"; t.setAttribute("role", "status");
+    t.innerHTML = '<span class="ck">' + ic("check", 12) + '</span><span class="tm">' + esc(msg) + "</span>" + (undo ? '<button class="ld-btn soft sm" data-u>Undo</button>' : "") + '<button class="tx" aria-label="Close">' + ic("x", 12) + "</button>";
+    if (undo) t.querySelector("[data-u]").onclick = function () { undo(); t.remove(); };
+    t.querySelector(".tx").onclick = function () { t.remove(); };
+    toastBox.appendChild(t); setTimeout(function () { t.remove(); }, undo ? 6000 : 3200);
+  }
+  /* progress sheet: "Creating Your Story..." / "Playing Your Voice..." */
+  function progressSheet(title, text, ms, done) {
+    var el = overlay('<div class="psheet"><span class="spin">' + Array(8).join("<i></i>") + "<i></i></span><h3>" + title + "</h3><p>" + text + '</p><div class="bar"><i id="psb"></i></div><small id="psp">0%</small></div>', true);
+    el.classList.add("ps-ov");
+    var k = 0, steps = 25, iv = setInterval(function () {
+      k++; var v = Math.min(100, Math.round(k / steps * 100)); var b = $("#psb"); if (b) b.style.width = v + "%"; var t = $("#psp"); if (t) t.textContent = v + "%";
+      if (k >= steps) { clearInterval(iv); setTimeout(function () { closeOverlay(); done(); }, 250); }
+    }, ms / steps);
+  }
+  function txAdd(type, title, amt) { st.tx = st.tx || []; st.tx.unshift({ type: type, title: title, amt: amt, at: Date.now() }); }
+
+  /* ---------- Shell: menu like the app (Favorites only under Your space) ---------- */
+  function sidebar(a) {
+    var h = '<aside class="ld-sidebar"><a data-go="home"><img class="ld-logo" src="' + IMG.logo + '" alt="LullaDream"></a><nav class="ld-navlist"><div class="ld-navlabel">' + T("menu") + "</div>";
+    NAV.forEach(function (n) { h += '<a class="ld-navitem' + (n[0] === a ? " is-active" : "") + '" data-go="' + n[0] + '">' + ic(n[2], 22) + T(n[1]) + (n[0] === "mystory" ? '<span class="count">' + st.mine.length + "</span>" : "") + "</a>"; });
+    h += '<div class="ld-navlabel" style="margin-top:20px">' + T("space") + "</div>";
+    h += '<a class="ld-navitem' + (a === "favorites" ? " is-active" : "") + '" data-go="favorites">' + ic("heart", 22) + T("favorites") + (st.favs.length ? '<span class="count">' + st.favs.length + "</span>" : "") + "</a>";
+    h += '</nav><div class="ld-sidebar-foot"><div class="ld-mini-create"><img src="' + IMG.orb + '" alt=""><b>' + T("create1") + " <span>" + T("create2") + "</span></b>" +
+      '<a class="ld-btn primary sm block" data-go="create"><span class="spark">' + ic("spark", 16) + "</span>" + T("generate") + "</a></div></div></aside>";
+    return h;
+  }
+  function bnav(a) {
+    return '<nav class="ld-bnav">' + NAV.map(function (n) { return '<a class="' + (n[0] === a ? "is-active" : "") + '" data-go="' + n[0] + '"><i>' + ic(n[2], 22) + "</i>" + T(n[1]) + "</a>"; }).join("") + "</nav>";
+  }
+  function topbar(o) {
+    var h = '<header class="ld-topbar">';
+    if (!o.back && !o.title) h += '<a class="only-mobile" data-go="home"><img src="' + IMG.logo + '" alt="LullaDream" style="height:40px;width:auto"></a>';
+    if (o.back) h += '<button class="ld-iconbtn" data-act="back" aria-label="Back">' + ic("back", 20) + "</button>";
+    if (o.title) h += "<h1>" + esc(o.title) + "</h1>";
+    if (o.search) h += '<form class="ld-search" data-form="tsearch">' + ic("search", 20) + '<input id="tsearch" type="search" placeholder="' + T("search") + '" aria-label="Search stories"><kbd>⌘K</kbd></form>';
+    h += '<div class="ld-spacer"></div>';
+    var u = unread();
+    h += '<button class="ld-iconbtn" data-go="notifications" aria-label="Notifications">' + ic("bell", 20) + (u ? '<span class="ld-dot">' + u + "</span>" : "") + "</button>";
+    h += '<button class="ld-coin" data-go="topup" aria-label="Coins"><i></i>' + short(st.coins) + "</button>";
+    h += '<span class="ld-userchip" data-go="profile"><span class="ld-avatar" style="width:40px;height:40px"><img src="' + IMG.avatar + '" alt=""></span><span><b>' + esc(st.user.name) + "</b><small>" + planName(st.user.plan) + "</small></span></span>";
+    return h + "</header>";
+  }
+  function fromMine(m) { return { id: m.id, t: m.title, c: m.cat || D.CAT_FOR_TYPE[m.type] || "Bravery & Adventure", m: m.m, cover: m.cover, text: m.text, country: "LullaDream Original", age: m.listener, mine: true, pub: m.public, src: m, pop: 0 }; }
+
+  /* ---------- Home: greeting without search ---------- */
+  var _vHome = vHomeOld;
+  function vHome() {
+    var v = _vHome();
+    v.html = v.html.replace(/<form class="ld-search" data-form="tsearch">[\s\S]*?<\/form><\/div>/, "</div>");
+    v.search = true;
+    return v;
+  }
+
+  /* ---------- Filters (Library + My Story), collapsible ---------- */
+  var FDUR = [["short", "Short (< 5 min)"], ["medium", "Medium (5-10 min)"], ["long", "Long (> 10 min)"]];
+  var FAGE = [["2-4", "2 - 4 years"], ["4-5", "4 - 5 years"], ["5-8", "5 - 8 years"]];
+  function fDur(m) { return m < 5 ? "short" : m <= 10 ? "medium" : "long"; }
+  function fAge(a) { return { "2–3": "2-4", "4–5": "4-5", "6–8": "5-8", "9–12": "5-8", "1-2 years": "2-4", "3-4 years": "2-4", "5-6 years": "5-8", "7-8 years": "5-8" }[a] || "5-8"; }
+  var flt = { lib: { cats: [], countries: [], durs: [], ages: [], open: true }, my: { cats: [], durs: [], ages: [], open: false } };
+  try { var fo = JSON.parse(localStorage.getItem("ld-filter-open") || "{}"); if (fo.lib != null) flt.lib.open = fo.lib; if (fo.my != null) flt.my.open = fo.my; } catch (e) { }
+  function saveOpen() { try { localStorage.setItem("ld-filter-open", JSON.stringify({ lib: flt.lib.open, my: flt.my.open })); } catch (e) { } }
+  function fCount(f) { return (f.cats || []).length + (f.countries || []).length + (f.durs || []).length + (f.ages || []).length; }
+  function fMatch(f, s) {
+    return (!f.cats.length || f.cats.indexOf(s.c) > -1) && (!f.countries || !f.countries.length || f.countries.indexOf(s.country) > -1) &&
+      (!f.durs.length || f.durs.indexOf(fDur(s.m)) > -1) && (!f.ages.length || f.ages.indexOf(fAge(s.age)) > -1);
+  }
+  function chipGroup(scope, title, k, items) {
+    var f = flt[scope];
+    return '<div class="fg"><h4>' + title + '</h4><div class="fchips"><button class="fchip' + (!f[k].length ? " on" : "") + '" data-act="fchip" data-s="' + scope + '" data-k="' + k + '" data-v="">All</button>' +
+      items.map(function (it) { var v = Array.isArray(it) ? it[0] : it, l = Array.isArray(it) ? it[1] : it; return '<button class="fchip' + (f[k].indexOf(v) > -1 ? " on" : "") + '" data-act="fchip" data-s="' + scope + '" data-k="' + k + '" data-v="' + esc(v) + '">' + esc(l) + "</button>"; }).join("") + "</div></div>";
+  }
+  function filterBody(scope) {
+    var cats = D.CATS.slice().sort();
+    return chipGroup(scope, "Categories", "cats", cats) + (scope === "lib" ? chipGroup(scope, "Country of Origin", "countries", D.COUNTRIES) : "") + chipGroup(scope, "Story Duration", "durs", FDUR) + chipGroup(scope, "Age Group", "ages", FAGE);
+  }
+  function filterPanel2(scope) {
+    var f = flt[scope];
+    return '<aside class="fpanel' + (f.open ? "" : " closed") + '" id="fp-' + scope + '"><div class="fp-head"><h3>' + ic("sliders", 18) + 'Filter</h3><button class="fp-clear" data-act="fclear" data-s="' + scope + '">Clear All</button><button class="fp-min" data-act="ftoggle" data-s="' + scope + '" aria-label="Minimize filter" title="Minimize">' + ic("prev", 18) + '</button></div><div class="fp-body">' + filterBody(scope) + "</div></aside>";
+  }
+  function filterBtn(scope) {
+    var n = fCount(flt[scope]);
+    return '<button class="fbtn' + (flt[scope].open ? " on" : "") + '" data-act="ftoggle" data-s="' + scope + '" aria-label="Filter" title="Filter">' + ic("sliders", 20) + '<span class="fbtn-l">Filter</span>' + (n ? "<b>" + n + "</b>" : "") + "</button>";
+  }
+  function isNarrow() { return window.innerWidth < 1200; }
+  function refreshFilter(scope) {
+    var p = $("#fp-" + scope); if (p) p.querySelector(".fp-body").innerHTML = filterBody(scope);
+    var sh = $("#fsheet-body"); if (sh) sh.innerHTML = filterBody(scope);
+    $$('.fbtn[data-s="' + scope + '"]').forEach(function (b) { b.outerHTML = filterBtn(scope); });
+    if (scope === "lib") { var b2 = $("#libbody"); if (b2) b2.innerHTML = libBody(); }
+    else { var g = $("#mygrid"); if (g) g.innerHTML = myBody(); }
+  }
+  function openFilterSheet(scope) {
+    var el = overlay('<div class="dlg fsheet"><div class="fs-head"><h3>Filter</h3><button class="tx" data-x="c" aria-label="Close">' + ic("x", 16) + '</button></div><div class="fs-body" id="fsheet-body">' + filterBody(scope) + '</div><div class="fs-foot"><button class="ld-btn pill cancel2" data-act="fclear" data-s="' + scope + '">Clear All</button><button class="ld-btn pill primary" data-x="ok">Apply</button></div></div>', false, true);
+    el.classList.add("fs-ov");
+    el.querySelector('[data-x="c"]').onclick = closeOverlay; el.querySelector('[data-x="ok"]').onclick = closeOverlay;
+  }
+
+  /* ---------- Library ---------- */
+  function libResults() {
+    var q = lib.q.trim().toLowerCase();
+    var r = allStories().filter(function (s) { return (!q || (s.t + " " + s.c + " " + s.country).toLowerCase().indexOf(q) > -1) && fMatch(flt.lib, s); });
+    var srt = { popular: function (a, b) { return b.pop - a.pop; }, az: function (a, b) { return a.t.localeCompare(b.t); }, short: function (a, b) { return a.m - b.m; }, long: function (a, b) { return b.m - a.m; } }[lib.sort];
+    return r.sort(srt);
+  }
+  function libBody() {
+    var r = libResults();
+    var res = r.length ? (lib.view === "grid" ? '<div class="ld-grid">' + r.map(function (s) { return tile(s); }).join("") + "</div>" : '<div class="lib-rows">' + r.map(row).join("") + "</div>")
+      : empty("search", "No stories found", "Try a different word or clear some filters.", '<button class="ld-btn secondary pill" data-act="fclear" data-s="lib">Clear filters</button>');
+    return '<p class="ld-muted lib-count"><b>' + r.length + "</b> stories</p>" + res;
+  }
+  function vLibrary(q) {
+    if (q.get("q") != null) lib.q = q.get("q");
+    if (q.get("cat")) flt.lib.cats = [q.get("cat")];
+    var h = '<section class="lib2' + (flt.lib.open ? "" : " fclosed") + '" id="lib2">' + filterPanel2("lib") +
+      '<div class="lib2-main"><div class="lib-head"><h1 class="ld-h-page hide-mobile">' + T("library") + "</h1>" +
+      '<div class="ld-search">' + ic("search", 20) + '<input id="lq" type="search" placeholder="' + T("search") + '" value="' + esc(lib.q) + '" aria-label="Search library"></div>' + filterBtn("lib") +
+      '<select class="ld-input lib-sort" data-act="lsort" aria-label="Sort">' + [["popular", "Most popular"], ["az", "A – Z"], ["short", "Shortest first"], ["long", "Longest first"]].map(function (o) { return '<option value="' + o[0] + '"' + (lib.sort === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" +
+      '<div class="ld-seg hide-mobile"><span class="' + (lib.view === "grid" ? "on" : "") + '" data-act="lview" data-v="grid" title="Grid">' + ic("grid", 16) + '</span><span class="' + (lib.view === "list" ? "on" : "") + '" data-act="lview" data-v="list" title="List">' + ic("list", 16) + "</span></div></div>" +
+      '<div id="libbody" class="ld-section" style="gap:16px">' + libBody() + "</div></div></section>";
+    return { active: "library", title: T("library"), html: h, after: function () { var i = $("#lq"); if (q.get("q") && i) { i.focus(); } } };
+  }
+  function refreshLib() { refreshFilter("lib"); }
+
+  /* ---------- My Story ---------- */
+  var my = { tab: "gen", q: "", sel: null };
+  function myGenList() {
+    var q = my.q.trim().toLowerCase();
+    return st.mine.map(fromMine).filter(function (s) { return (!q || s.t.toLowerCase().indexOf(q) > -1) && fMatch(flt.my, s); });
+  }
+  function myRecList() {
+    var q = my.q.trim().toLowerCase();
+    return (st.recorded || []).map(getStory).filter(function (s) { return s && (!q || s.t.toLowerCase().indexOf(q) > -1) && fMatch(flt.my, s); });
+  }
+  function myCard(s) {
+    return '<article class="ld-tile mycard" data-go="story/' + s.id + '"><div class="ld-cover"><img src="' + IMG[s.cover] + '" alt="" loading="lazy"><span class="ld-dur">' + ic("play", 12) + " " + s.m + ' Min</span><span class="vis">' + ic(s.pub ? "globe" : "lockc", 13) + (s.pub ? "Public" : "Private") + "</span></div>" +
+      '<div class="ld-meta"><span class="ld-cat">' + esc(s.c) + '</span><h3 class="ld-ttl">' + esc(s.t) + '</h3></div><div class="my-actions"><button data-act="mreport" data-id="' + s.id + '">' + ic("flag", 14) + 'Report</button><button class="del" data-act="mdel2" data-id="' + s.id + '">' + ic("trash", 14) + "Delete</button></div></article>";
+  }
+  function myEmpty() {
+    return '<div class="ld-panel my-empty"><svg width="120" height="104" viewBox="0 0 120 104" aria-hidden="true"><path d="M60 26C46 14 26 12 10 16v76c16-4 36-2 50 10 14-12 34-14 50-10V16C94 12 74 14 60 26z" fill="#ebeeff" stroke="#595cff" stroke-width="3"/><path d="M60 26v76" stroke="#595cff" stroke-width="3"/><path d="M22 34c10-2 20-1 28 4M22 46c10-2 20-1 28 4M22 58c10-2 20-1 28 4" stroke="#ffa42a" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M72 20l22-10 10 22" fill="#595cff" opacity=".85"/></svg>' +
+      '<h3>Your story library is empty</h3><p>Let\'s create your first magical tale!</p><a class="ld-btn primary lg pill" data-go="create">Generate Story</a></div>';
+  }
+  function myBody() {
+    if (my.tab === "gen") {
+      var l = myGenList();
+      if (!st.mine.length) return myEmpty();
+      return l.length ? '<div class="ld-grid my-grid">' + l.map(myCard).join("") + "</div>" : empty("search", "No stories match", "Try another word or clear the filter.");
+    }
+    var r = myRecList();
+    if (!(st.recorded || []).length) return '<div class="ld-panel my-empty"><span class="art">' + ic("mic", 48) + '</span><h3>No recorded stories yet</h3><p>Stories you listen to with a voice appear here.</p></div>';
+    if (my.sel) {
+      return '<div class="selbar"><h3>Select to remove</h3><button class="lnk" data-act="selall">Select All</button></div><div class="rec-list">' + r.map(function (s) {
+        var on = my.sel.indexOf(s.id) > -1;
+        return '<button class="rec-row sel' + (on ? " on" : "") + '" data-act="selrec" data-id="' + s.id + '"><img src="' + IMG[s.cover] + '" alt=""><span class="rb"><small>' + esc(s.c) + "</small><b>" + esc(s.t) + "</b><em>" + s.m + ' minutes</em></span><span class="rc">' + (on ? ic("check", 14) : "") + "</span></button>";
+      }).join("") + '</div><div class="selfoot"><button class="ld-btn pill cancel2" data-act="selcancel">Cancel</button><button class="ld-btn pill remove" data-act="selremove"' + (my.sel.length ? "" : " disabled") + ">Remove " + my.sel.length + " " + (my.sel.length === 1 ? "Story" : "Stories") + "</button></div>";
+    }
+    return '<div class="rec-list">' + r.map(function (s) {
+      return '<article class="rec-row" data-go="story/' + s.id + '"><img src="' + IMG[s.cover] + '" alt=""><span class="rb"><small>' + esc(s.c) + "</small><b>" + esc(s.t) + '</b><span class="ld-pillplay">' + ic("play", 14) + " " + s.m + ' Min</span></span><button class="kebab" data-act="selstart" data-id="' + s.id + '" aria-label="More">' + ic("dots", 18) + "</button></article>";
+    }).join("") + "</div>";
+  }
+  function vMyStory() {
+    var h = '<section class="page-head"><div class="grow"><h1 class="ld-h-page">' + T("mystory") + "</h1><p>" + st.mine.length + ' stories you created</p></div><a class="ld-btn primary pill" data-go="create"><span class="spark">' + ic("spark", 18) + "</span>" + T("generate") + "</a></section>" +
+      '<section class="lib2' + (flt.my.open ? "" : " fclosed") + '" id="my2">' + filterPanel2("my") + '<div class="lib2-main"><div class="lib-head"><div class="ld-seg mytabs"><span class="' + (my.tab === "gen" ? "on" : "") + '" data-act="mytab2" data-v="gen">' + ic("spark", 14) + 'Generated Stories</span><span class="' + (my.tab === "rec" ? "on" : "") + '" data-act="mytab2" data-v="rec">' + ic("mic", 14) + "Recorded Stories</span></div>" +
+      '<div class="ld-search">' + ic("search", 20) + '<input id="myq2" type="search" placeholder="Search your stories" value="' + esc(my.q) + '"></div>' + filterBtn("my") + '</div><div id="mygrid">' + myBody() + "</div></div></section>";
+    return { active: "mystory", title: T("mystory"), html: h };
+  }
+
+  /* ---------- Story player (as in the app) ---------- */
+  function hasAudio(s) { return !s.mine || !!(st.audio || {})[s.id]; }
+  function vStory(id) {
+    var s = getStory(id);
+    if (!s) return vNotFound();
+    pl.id = id;
+    var dur = s.m * 60, pos = Math.min(st.progress[id] || 0, dur), f = isFav(id), aud = hasAudio(s);
+    var vname = voiceName((st.audio || {})[id] || st.voice);
+    var h = '<section class="player2"><div class="p2-left"><div class="p2-cover"><img src="' + IMG[s.cover] + '" alt="">' +
+      '<button class="p2-ic l" data-act="back" aria-label="Back">' + ic("back", 18) + '</button><div class="p2-tr"><button class="p2-ic" data-act="share2" data-id="' + id + '" aria-label="Share">' + ic("share", 16) + '</button><button class="p2-ic" data-act="sounds" aria-label="Background sounds">' + ic("sliders", 16) + "</button></div>" +
+      (aud ? '<button class="p2-narr" data-act="pvoice">' + ic("speaker", 14) + "<span id=\"pvoice\">" + esc(vname) + "</span></button>" : "") + "</div>" +
+      '<div class="p2-info"><span class="ld-cat">' + esc(s.c) + "</span><h1>" + esc(s.t) + "</h1>" +
+      '<div class="p2-time"><span id="pcur">' + mmss(pos) + "</span><span>" + mmss(aud ? dur : 0) + '</span></div><div class="scrub" data-act="seek"><i id="pfill" style="width:' + (pos / dur * 100) + '%"></i><b id="pknob" style="left:' + (pos / dur * 100) + '%"></b></div>' +
+      '<div class="p2-ctrl"><button class="p2-heart' + (f ? " on" : "") + '" data-act="fav" data-id="' + id + '" aria-label="Favorite">' + ic(f ? "heartf" : "heart", 24) + '</button><button class="ld-play" id="pbtn" data-act="play2" aria-label="Play">' + ic(pl.playing ? "pause" : "play", 26) + '</button><button class="p2-share" data-act="share2" data-id="' + id + '" aria-label="Share">' + ic("share", 22) + "</button></div></div></div>" +
+      '<div class="ld-panel p2-read"><div class="ld-section-head"><h2>' + T("read") + '</h2><button class="p2-exp" data-act="readfull" aria-label="Expand">' + ic("expand", 18) + '</button></div><div class="ld-reader" id="reader">' + s.text.map(function (t, i) { return '<p data-act="seekp" data-i="' + i + '">' + esc(t) + "</p>"; }).join("") + "</div></div></section>";
+    return { active: s.mine ? "mystory" : "library", title: "", back: false, html: h, doc: s.t, after: updPlayer };
+  }
+  function updPlayer() {
+    var s = getStory(pl.id); if (!s || !$("#pfill")) return;
+    var dur = s.m * 60, pos = Math.min(st.progress[s.id] || 0, dur), r = pos / dur * 100;
+    $("#pfill").style.width = r + "%"; $("#pknob").style.left = r + "%"; $("#pcur").textContent = mmss(pos);
+    $("#pbtn").innerHTML = ic(pl.playing ? "pause" : "play", 26);
+    var n = s.text.length, idx = pos > 0 ? Math.min(n - 1, Math.floor(pos / dur * n)) : -1;
+    $$("#reader p").forEach(function (p, i) { p.classList.toggle("hl", i === idx); });
+  }
+  function shareSheet(s) {
+    var link = location.href.split("#")[0] + "#/story/" + s.id, enc = encodeURIComponent(link), txt = encodeURIComponent(s.t + " — LullaDream");
+    var qr = ""; for (var y = 0; y < 21; y++) for (var x = 0; x < 21; x++) { var c = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13); var on = c ? ((x % 20 === 0 || x % 20 === 6 || x === 14 || y === 0 || y === 6 || y === 14 || y === 20) || (((x % 14) > 1 && (x % 14) < 5) && ((y % 14) > 1 && (y % 14) < 5))) : ((s.id.charCodeAt((x * 7 + y) % s.id.length) * (x + 3) * (y + 5)) % 3 === 0); if (on) qr += '<rect x="' + x + '" y="' + y + '" width="1" height="1"/>'; }
+    var items = [["Instagram", '<span class="sh-ig">' + ic("camera", 20) + "</span>", "https://www.instagram.com/"], ["Facebook", '<span class="sh-fb">f</span>', "https://www.facebook.com/sharer/sharer.php?u=" + enc], ["X", '<span class="sh-x">𝕏</span>', "https://twitter.com/intent/tweet?url=" + enc + "&text=" + txt], ["WhatsApp", '<span class="sh-wa">' + ic("headset", 18) + "</span>", "https://wa.me/?text=" + txt + "%20" + enc], ["Copy link", '<span class="sh-plain">' + ic("link", 20) + "</span>", "copy"], ["More", '<span class="sh-plain">' + ic("more", 20) + "</span>", "more"]];
+    var el = overlay('<div class="share2"><div class="sh-card"><img src="' + IMG[s.cover] + '" alt=""><span class="ld-cat">' + esc(s.c) + "</span><b>" + esc(s.t) + '</b><div class="sh-foot"><img src="' + IMG.logo + '" alt="LullaDream"><svg viewBox="-1 -1 23 23" width="64" height="64" fill="#131313">' + qr + '</svg></div></div><div class="sh-sheet"><div class="fs-head"><h3>Share story</h3><button class="tx" data-x="c" aria-label="Close">' + ic("x", 16) + '</button></div><div class="sh-grid">' +
+      items.map(function (it) { return '<button data-u="' + it[2] + '">' + it[1] + "<small>" + it[0] + "</small></button>"; }).join("") + "</div></div></div>", false);
+    el.classList.add("sh-ov");
+    el.querySelector('[data-x="c"]').onclick = closeOverlay;
+    $$("[data-u]", el).forEach(function (b) {
+      b.onclick = function () {
+        var u = b.getAttribute("data-u");
+        if (u === "copy") { (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(function () { toast("Link copied"); }, function () { toast(link); }); }
+        else if (u === "more") { if (navigator.share) navigator.share({ title: s.t, url: link }).catch(function () { }); else toast("Sharing isn't supported here"); }
+        else window.open(u, "_blank", "noopener");
+      };
+    });
+  }
+
+  /* ---------- Generate Your Story (6 steps, as in the app) ---------- */
+  var G_AGES = ["1 - 2 years", "3 - 4 years", "5 - 6 years", "7 - 8 years"];
+  var G_STYLES = [["imaginative", "Imaginative", "🎩"], ["gentle", "Gentle & Soothing", "😴"], ["playful", "Playful & Fun", "🎈"], ["adventure", "Adventure-Packed", "🗺️"], ["heartwarming", "Heartwarming", "❤️"], ["animal", "Animal Friends", "🐶"]];
+  var G_TYPES = [["Bravery & Adventure", "🏰"], ["Clever Heroes", "🧠"], ["Legends & Myths", "📜"], ["Magic & Transformations", "🪄"], ["Wisdom & Morality", "📖"]];
+  var G_DURS = [3, 5];
+  var G_LESSONS = ["Be curious, ask questions.", "Be kind to everyone.", "Sharing makes us happy.", "It's okay to be scared — be brave anyway.", "Always tell the truth.", "Friends help each other."];
+  var G_STEPS = ["Character", "Who is this story for?<br>(Listener's Age)", "Writing Style", "Story Type", "Story Duration", "Optional Form"];
+  var g2 = { step: 0, d: null };
+  function g2new() { return { name: "", age: 6, about: "", listener: "", style: "", cat: "", m: 0, title: "", lesson: "", own: false, msg: "" }; }
+  function g2valid(i) { var d = g2.d; return [d.name.trim() && d.about.trim().length >= 3, !!d.listener, !!d.style, !!d.cat, !!d.m, true][i]; }
+  function g2body(i) {
+    var d = g2.d;
+    if (i === 0) return '<div class="g2-form two-col"><div class="ld-field"><label for="g-name">Main character\'s name <em>*</em></label><input id="g-name" class="ld-input" data-g="name" maxlength="50" value="' + esc(d.name) + '" placeholder="Enter character name"><span class="ld-count" data-gc="name">' + d.name.length + "/50</span></div>" +
+      '<div class="ld-field"><label for="g-age">How old is the character?</label><b class="g-agev" data-gc="age">' + d.age + ' years old</b><input id="g-age" type="range" class="range" min="1" max="12" data-g="age" value="' + d.age + '"></div>' +
+      '<div class="ld-field full"><label for="g-about">What\'s your story about? (Short or detailed—your imagination leads the way!) <em>*</em></label><div class="ta-wrap"><textarea id="g-about" class="ld-input" data-g="about" maxlength="500" placeholder="A brave fox explores a hidden forest to find a glowing star...">' + esc(d.about) + '</textarea><button class="mic" data-act="dictate2" title="Voice input">' + ic("mic", 18) + '</button></div><span class="ld-count" data-gc="about">' + d.about.length + "/500</span></div></div>";
+    if (i === 1) return '<div class="g2-opts ages">' + G_AGES.map(function (a) { return '<button class="g2-opt' + (d.listener === a ? " on" : "") + '" data-act="gopt" data-f="listener" data-v="' + a + '">' + a + "</button>"; }).join("") + "</div>";
+    if (i === 2) return '<div class="g2-opts styles">' + G_STYLES.map(function (x) { return '<button class="g2-opt col' + (d.style === x[0] ? " on" : "") + '" data-act="gopt" data-f="style" data-v="' + x[0] + '"><span class="emo">' + x[2] + "</span>" + x[1] + "</button>"; }).join("") + "</div>";
+    if (i === 3) return '<div class="g2-opts types">' + G_TYPES.map(function (x) { return '<button class="g2-opt row' + (d.cat === x[0] ? " on" : "") + '" data-act="gopt" data-f="cat" data-v="' + x[0] + '"><span class="emo">' + x[1] + "</span>" + x[0] + "</button>"; }).join("") + "</div>";
+    if (i === 4) return '<div class="g2-opts durs">' + G_DURS.map(function (m) { return '<button class="g2-opt row' + (d.m === m ? " on" : "") + '" data-act="gopt" data-f="m" data-v="' + m + '">' + m + " Minutes</button>"; }).join("") + "</div>";
+    return '<div class="g2-form"><div class="ld-field"><label for="g-title">Title</label><input id="g-title" class="ld-input" data-g="title" maxlength="80" value="' + esc(d.title) + '" placeholder="The Little Star in the Forest"></div>' +
+      '<div class="ld-field"><label>Story Message</label><span class="hint">Add a moral or special note to your story 📚</span>' +
+      (d.own ? '<textarea class="ld-input" data-g="msg" maxlength="200" placeholder="Write your own message…" style="min-height:96px">' + esc(d.msg) + "</textarea>"
+        : '<select class="ld-input" data-g="lesson"><option value="">Select a lesson (optional)</option>' + G_LESSONS.map(function (l) { return "<option" + (d.lesson === l ? " selected" : "") + ">" + l + "</option>"; }).join("") + "</select>") +
+      '</div><label class="g2-toggle" data-act="gown"><span class="ld-toggle' + (d.own ? " on" : "") + '"></span>Write My Own Message</label></div>';
+  }
+  function vCreate() {
+    if (!g2.d) g2 = { step: 0, d: g2new() };
+    var i = g2.step, last = i === 5, ok = g2valid(i);
+    var h = '<section class="g2"><div class="g2-head"><button class="sh-back" data-act="g2back" aria-label="Back">' + ic("back", 24) + '</button><h1><span class="spark">' + ic("spark", 26) + "</span>Generate Your Story</h1>" +
+      '<div class="g2-bars">' + G_STEPS.map(function (s, k) { return '<i class="' + (k <= i ? "on" : "") + '"></i>'; }).join("") + '</div></div><div class="g2-card"><h2>' + G_STEPS[i] + "</h2>" + g2body(i) + "</div>" +
+      '<div class="g2-foot"><button class="ld-btn primary lg pill block" data-act="' + (last ? "g2gen" : "g2next") + '" id="g2btn"' + (ok ? "" : " disabled") + ">" + (last ? '<span class="spark">' + ic("spark", 18) + "</span>Generate Story" : "Next") + "</button></div></section>";
+    return { active: "create", title: "", back: false, html: h, doc: "Generate Your Story" };
+  }
+  function g2refreshBtn() { var b = $("#g2btn"); if (b) b.disabled = !g2valid(g2.step); }
+
+  /* ---------- Select Voice (page) — "Use for this story" + Preview ---------- */
+  var MORE_VOICES = [["bela", "Bela"], ["sarah", "Sarah"], ["george", "George"], ["tom", "Tom"], ["clara", "Clara"]];
+  var _voiceName = voiceNameOld;
+  function voiceName(id) { var m = MORE_VOICES.filter(function (v) { return v[0] === id; })[0]; return m ? m[1] : _voiceName(id); }
+  function vSelectVoice(q) {
+    if (q.get("for")) svFor = q.get("for");
+    function item(id, name, img, mine) {
+      return '<div class="sv-item' + (svPick === id ? " is-on" : "") + '" data-act="svpick" data-v="' + id + '" role="button" tabindex="0"><span class="sv-av' + (img ? "" : " letter") + '">' + (img ? '<img src="' + img + '" alt="">' : mine ? ic("user", 34) : "<b>" + name.charAt(0) + "</b>") + (mine ? '<span class="sv-cost"><i></i>100</span>' : "") + '<span class="sv-ck">' + ic("check", 14) + "</span></span><b>" + esc(name) + "</b>" + (mine ? "<small>Use for this story</small>" : "") + '<button class="sv-pv" data-act="vplay" data-id="' + id + '">' + ic("play", 10) + "Preview</button></div>";
+    }
+    var h = '<section class="svp"><header class="sv-head"><h1>Select Voice</h1><button class="sv-x" data-act="svclose" aria-label="Close">' + ic("x", 20) + "</button></header>" +
+      '<div class="sv-body"><h3>With My Voice</h3><div class="sv-grid">' + st.voices.map(function (v) { return item(v.id, v.name, null, true); }).join("") +
+      '<div class="sv-item sv-new" data-act="vnew" role="button" tabindex="0"><span class="sv-av">' + ic("plus", 32) + '<span class="sv-cost"><i></i>100</span></span><b>New Voice</b></div></div>' +
+      "<h3>LullaDream's Voices</h3><div class=\"sv-grid\">" + [["yasmin", "Yasmin"], ["rudy", "Rudy"], ["wanda", "Wanda"]].map(function (v) { return item(v[0], v[1], IMG["v_" + v[0]], false); }).join("") + MORE_VOICES.map(function (v) { return item(v[0], v[1], null, false); }).join("") + "</div></div>" +
+      '<footer class="sv-foot"><button class="ld-btn primary lg block pill" data-act="svuse"' + (svPick ? "" : " disabled") + ">Use Voice</button></footer></section>";
+    return { active: svFor.indexOf("story/") === 0 ? "library" : "profile", title: "", back: false, html: h, doc: "Select Voice" };
+  }
+
+  /* ---------- Profile (as in the app) ---------- */
+  function li2(icn, text, to, cls, act) {
+    return '<div class="ld-li ' + (cls || "") + '" ' + (act ? 'data-act="' + act + '"' : 'data-go="' + to + '"') + '><span class="ic">' + ic(icn, 20) + '</span><span class="tx">' + text + '</span><span class="chev">' + ic("next", 18) + "</span></div>";
+  }
+  function coinCard() {
+    return '<div class="coin2"><div><small>' + PT("coins") + "</small><strong>" + coinIco(26) + st.coins + " " + PT("coinsW") + '<button data-act="refreshcoins" aria-label="Refresh">' + ic("refresh", 20) + "</button></strong><em>" + planName(st.user.plan) + '</em></div><button class="c2-top" data-go="topup"><span>' + ic("topup", 22) + "</span>" + PT("topup") + "</button></div>";
+  }
+  function vProfile() {
+    var h = '<section class="prof2-top"><div class="prof2-head"><span class="ld-avatar"><img src="' + IMG.avatar + '" alt=""></span><div><h2>' + esc(st.user.name) + '</h2><span class="plan"><i></i>' + planName(st.user.plan) + "</span></div></div>" + coinCard() + "</section>" +
+      '<section class="prof2-cols"><div><h3 class="prof2-h">' + PT("info") + '</h3><div class="ld-panel prof2-list">' +
+      li2("user", PT("settings"), "settings") + li2("mic", PT("voices"), "voices") + li2("card", PT("subs"), "subscription") + li2("globe", PT("lang"), "language") + li2("clock", PT("recent"), "recent") + li2("heart", PT("fav"), "favorites") + "</div></div>" +
+      '<div><h3 class="prof2-h">' + PT("help") + '</h3><div class="ld-panel prof2-list">' + li2("help", PT("faq"), "help/faq") + li2("headset", PT("support"), "help/support") + li2("gear", PT("trouble"), "help/troubleshooting") + li2("doc", PT("terms"), "help/terms") + li2("shield", PT("privacy"), "help/privacy") + li2("trash", PT("del"), "delete-account", "danger") + "</div>" +
+      '<button class="ld-btn secondary pill block prof2-out" data-act="signout">' + ic("logout", 18) + PT("signout") + "</button></div></section>";
+    return { active: "profile", title: T("profile"), html: h };
+  }
+  function vSettings() {
+    var u = st.user;
+    var h = subhead(PT("settings")) + '<form class="ld-panel set2" data-form="profile2" novalidate><div class="set2-av"><span class="ld-avatar"><img src="' + IMG.avatar + '" alt=""></span><button type="button" class="cam" data-act="avatarpick" aria-label="Change photo">' + ic("camera", 14) + '</button></div><div class="set2-grid">' +
+      '<div class="ld-field"><label for="p-name">Full Name <em>*</em></label><input id="p-name" name="name" class="ld-input" maxlength="40" value="' + esc(u.name) + '"></div>' +
+      '<div class="ld-field"><label for="p-age">Age <em>*</em></label><input id="p-age" name="age" type="number" min="13" max="120" class="ld-input" value="' + esc(u.age || 25) + '"></div>' +
+      '<div class="ld-field"><label for="p-gender">Gender <em>*</em></label><select id="p-gender" name="gender" class="ld-input">' + ["Male", "Female", "Prefer not to say"].map(function (x) { return "<option" + ((u.gender || "Male") === x ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select></div>" +
+      '<div class="ld-field"><label for="p-mail">Email Address <em>*</em></label><input id="p-mail" class="ld-input" value="' + esc(u.email) + '" disabled></div>' +
+      '<div class="ld-field"><label for="p-phone">Phone Number <em>*</em></label><input id="p-phone" name="phone" type="tel" class="ld-input" value="' + esc(u.phone || "+62 812 3456 7890") + '"></div></div>' +
+      '<div id="perr" class="error" style="color:var(--danger-600);font-size:14px"></div><button class="ld-btn primary lg pill set2-btn" type="submit">Update</button></form>';
+    return { active: "profile", title: "", html: h, doc: PT("settings") };
+  }
+  function vVoices() {
+    var h = subhead("Your Voice Recordings") + '<section class="ld-panel vr2"><div class="vr2-grid">' + st.voices.map(function (v) {
+      return '<div class="vr2-item"><span class="vr2-av">' + ic("user", 40) + '<button class="vr2-del" data-act="vdel2" data-id="' + v.id + '" aria-label="Delete ' + esc(v.name) + '">' + ic("trash", 13) + "</button></span><b>" + esc(v.name) + '</b><button class="sv-pv" data-act="vplay" data-id="' + v.id + '">' + ic("play", 10) + "Preview</button></div>";
+    }).join("") + '<div class="vr2-item" data-act="vnew" role="button" tabindex="0"><span class="vr2-av add">' + ic("plus", 32) + '<span class="sv-cost"><i></i>100</span></span><b>New Voice</b></div></div>' + (st.voices.length ? "" : '<p class="ld-muted" style="text-align:center">No voice recordings yet.</p>') + "</section>";
+    return { active: "profile", title: "", html: h, doc: "Voice Recordings" };
+  }
+  function vSubscription() {
+    var h = subhead("Manage Subscription") + '<section class="ld-panel sub2"><div class="sub2-top"><b>Super Premium</b><span class="ld-badge orange">Yearly</span></div><h2>USD 112.00</h2><p>Take storytelling to the next level with full creative control.</p>' +
+      '<ul><li>' + ic("check", 14) + 'Includes all Premium features</li><li>' + ic("check", 14) + 'Get 4800 coins to creating custom stories and voice cloning</li></ul><div class="sub2-exp"><small>Exp. date:</small><b>Tue, Mar 16 2027</b></div>' +
+      '<div class="sub2-btns"><button class="ld-btn pill cancel2" data-act="unsub">Unsubscribe</button><button class="ld-btn pill primary" data-act="downgrade">Downgrade</button></div></section>';
+    return { active: "profile", title: "", html: h, doc: "Manage Subscription" };
+  }
+  var LANGS = [["hr", "Croatian", "🇭🇷"], ["EN", "English (US)", "🇺🇸"], ["de", "German", "🇩🇪"], ["hi", "Hindi", "🇮🇳"], ["ID", "Indonesian", "🇮🇩"]];
+  var langPick = null;
+  function vLanguage() {
+    if (langPick == null) langPick = st.user.lang;
+    var h = subhead("Select Language") + '<section class="ld-panel lang2"><div class="lang2-list">' + LANGS.map(function (l) { return '<button class="lang2-row' + (langPick === l[0] ? " on" : "") + '" data-act="langpick" data-v="' + l[0] + '"><span class="fl">' + l[2] + "</span>" + l[1] + '<span class="rc">' + (langPick === l[0] ? ic("check", 14) : "") + "</span></button>"; }).join("") +
+      '</div><button class="ld-btn primary lg pill block" data-act="langgo"' + (langPick !== st.user.lang ? "" : " disabled") + ">Continue</button></section>";
+    return { active: "profile", title: "", html: h, doc: "Language" };
+  }
+  var TXF = { range: "all", type: "all" };
+  var TXTYPES = [["all", "All"], ["gen", "Generate Story"], ["clone", "Voice Cloning"], ["audio", "Audio Playback"], ["topup", "Top Up"], ["sub", "Subscription"]];
+  function vRecent() {
+    var now = Date.now(), lim = { all: 0, d7: now - 7 * 864e5, d30: now - 30 * 864e5 }[TXF.range];
+    var list = (st.tx || []).filter(function (t) { return (TXF.type === "all" || t.type === TXF.type) && t.at >= lim; });
+    var ico = { gen: "doc", clone: "mic", audio: "play", topup: "topup", sub: "card" };
+    var h = subhead(PT("recent")) + '<section class="tx2"><div class="tx2-bar"><label class="tx2-date">' + ic("cal", 18) + '<select data-act="txrange" aria-label="Filter by date range"><option value="all"' + (TXF.range === "all" ? " selected" : "") + '>Filter by Date Range</option><option value="d7"' + (TXF.range === "d7" ? " selected" : "") + '>Last 7 days</option><option value="d30"' + (TXF.range === "d30" ? " selected" : "") + ">Last 30 days</option></select></label>" +
+      '<div class="tx2-chips">' + TXTYPES.map(function (t) { return '<button class="fchip' + (TXF.type === t[0] ? " on" : "") + '" data-act="txtype" data-v="' + t[0] + '">' + t[1] + "</button>"; }).join("") + "</div></div>" +
+      (list.length ? '<div class="tx2-list">' + list.map(function (t) { var d = new Date(t.at); return '<div class="ld-panel tx2-row"><span class="ic">' + ic(ico[t.type] || "doc", 20) + '</span><span class="tb"><b>' + esc(t.title) + "</b><small>" + d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + ", " + d.toTimeString().slice(0, 5) + '</small></span><span class="amt' + (t.amt > 0 ? " plus" : "") + '">' + (t.amt > 0 ? "+" : "") + t.amt + "</span>" + ic("next", 16) + "</div>"; }).join("") + '</div><p class="ld-muted tx2-end">You\'ve reached the end of the list</p>'
+        : '<p class="ld-muted tx2-end">No transactions match your current filters</p>') + "</section>";
+    return { active: "profile", title: "", html: h, doc: PT("recent") };
+  }
+  function vFavorites() {
+    var l = st.favs.map(getStory).filter(Boolean);
+    var h = subhead(PT("fav")) + (l.length ? '<div class="ld-grid">' + l.map(function (s) { return tile(s); }).join("") + "</div>" : empty("heart", "No favorites yet", "Tap the heart on any story to keep it here.", '<a class="ld-btn primary pill" data-go="library">Browse the Library</a>'));
+    return { active: "favorites", title: "", html: h, doc: PT("fav") };
+  }
+  function bullets(a) { return "<ul>" + a.map(function (x) { return "<li>" + x + "</li>"; }).join("") + "</ul>"; }
+  function vTrouble() {
+    var items = [["monitor", "Story Not Playing?", ["Check your internet connection.", "Make sure Lulladream is updated to the latest version.", "Try closing and reopening the app."]],
+      ["lockc", "Premium Content Still Locked?", ["Confirm your subscription is active under My Account.", "Log out and log back in.", "If you've been charged but content is still locked, reach out to us."]],
+      ["mute", "No Narration or Sound?", ["Check that your device isn't on silent mode.", "Use headphones or external speakers for better clarity.", "Make sure narration is enabled in the story settings."]]];
+    var h = subhead("Troubleshooting Guide") + '<section class="doc2"><div class="ld-panel acc2">' + items.map(function (x, i) { return "<details" + (i === 0 ? " open" : "") + '><summary><span class="ic">' + ic(x[0], 18) + "</span>" + x[1] + ic("down", 18) + "</summary>" + bullets(x[2]) + "</details>"; }).join("") + "</div>" +
+      '<div class="ld-panel doc2-help"><h3>Still Need Help?</h3><p>It\'s okay — we\'re here for you. When reaching out, please include:</p>' + bullets(["The name of the story you're having trouble with", "Your device type (Android/iOS) and OS version", "A screenshot or short video, if possible"]) +
+      '<a class="ld-btn primary pill" href="mailto:support@lulladream.app">Email Our Support Team</a><p class="ld-muted small">Or check our <a data-go="help/faq">Help Center &amp; FAQ</a> for instant solutions.</p></div></section>';
+    return { active: "profile", title: "", html: h, doc: "Troubleshooting" };
+  }
+  function docPage(title, intro, sections) {
+    return subhead(title) + '<section class="doc2 cols">' + (intro ? '<p class="doc2-intro">' + intro + "</p>" : "") + sections.map(function (s) { return '<div class="ld-panel doc2-sec"><h3>' + s[0] + "</h3>" + bullets(s[1]) + "</div>"; }).join("") + '<p class="ld-muted doc2-upd">Last updated: September 2026</p></section>';
+  }
+  function vTerms() {
+    return { active: "profile", title: "", doc: "Terms & Conditions", html: docPage("Terms &amp; Conditions", "Welcome to <b>LullaDream</b>. By letting your little ones enjoy our bedtime stories, you agree to these guidelines to preserve a safe, cozy, and magical atmosphere.", [
+      ["Use of Service", ["Designed for family co-listening; parents should manage account setup and volume settings.", "Do not use the audio streams or story content for commercial public broadcasting.", "Always ensure a dim, comfortable, and safe room layout while stories are playing."]],
+      ["Subscription &amp; Payments", ["LullaDream Premium offers unlimited audiobooks and personalized narrations.", "Billed monthly or annually through your primary App Store or Google Play account.", "Cancel at any time through store settings; subscription benefits continue until the active cycle ends."]],
+      ["Content Ownership", ["All stories, character illustrations, ambient soundscapes, and narrations are copyrighted.", "Voice assets generated inside the app remain restricted to private personal use."]],
+      ["Limitation of Liability", ["Stories are for calming entertainment; we do not guarantee sleep duration or quality.", "Please use sleep-timer settings responsibly to avoid overnight playback loop."]]]) };
+  }
+  function vPrivacy() {
+    return { active: "profile", title: "", doc: "Privacy Policy", html: docPage("Privacy Policy", "", [
+      ["Children's Privacy (COPPA)", ["We collect zero direct behavioral or advertising identifiers from children.", "Voice features are strictly encrypted and never distributed to third parties.", "Explicit double-opt-in verified parent consent required for advanced features."]],
+      ["Data Retention &amp; Deletion", ["You may request complete scrubbing of your voice model at any time.", "Deleted account data is immediately removed from secure live database clusters."]]]) };
+  }
+  function vDeleteAcc() {
+    var h = subhead(PT("del")) + '<section class="del2"><div class="del2-warn">' + ic("alert", 20) + '<div><b>This action is permanent</b><p>All personalized stories, coin balances, custom voice models, and sleep trackers will be immediately purged.</p></div></div>' +
+      '<div class="ld-panel"><h3>What you\'ll lose permanently:</h3>' + bullets([num(st.coins) + " Coins active balance", st.mine.length + " Saved bedtime stories &amp; custom playlists", "Generated parental voice-narration models", "Active Premium subscription benefits"]) + "</div>" +
+      '<div class="ld-panel"><div class="ld-field"><label for="dc2">Type \'DELETE\' to confirm:</label><input id="dc2" class="ld-input" placeholder="DELETE" autocomplete="off"></div><button class="ld-btn pill block del2-btn" id="del2btn" data-act="delacc2" disabled>' + ic("trash", 16) + 'Permanently Delete Account</button><button class="lnk del2-cancel" data-act="back">Cancel</button></div></section>';
+    return { active: "profile", title: "", html: h, doc: PT("del") };
+  }
+  function vHelp(t) {
+    if (t === "troubleshooting") return vTrouble();
+    if (t === "terms") return vTerms();
+    if (t === "privacy") return vPrivacy();
+    if (t !== "support") return vSoon(t);
+    var h = subhead(PT("support")) + '<section class="cs2"><p class="cs2-intro">At <b>LullaDreams</b>, we\'re dedicated to helping little ones drift off peacefully—and giving parents one less thing to worry about. If something isn\'t working quite right, our support team is here to help with care and calm.</p>' +
+      '<div class="cs2-grid"><div class="ld-panel cs2-card"><h2>Contact Us</h2><p>Email: <a href="mailto:support@lulladream.app">support@lulladream.app</a></p><p>Support Hours: Every day | 8:00 AM – 10:00 PM</p><p>Response Time: Within 24 hours (usually sooner!)</p></div>' +
+      '<div class="ld-panel cs2-card"><h2>Whether you need help with:</h2><ul><li>Playing or loading a bedtime story</li><li>Accessing premium features</li><li>Using narration or setting a sleep timer</li></ul><p class="cs2-end">We\'ll walk you through it step by gentle step 🌙💤</p></div></div></section>';
+    return { active: "profile", title: "", html: h, doc: "Customer Support" };
+  }
+  var _vTopup = vTopupOld;
+  function vTopup() { var v = _vTopup(); v.html = subhead("Top Up Coins") + v.html; v.title = ""; v.back = false; return v; }
+
+  /* ---------- extra routes ---------- */
+  function routeExtra(name) {
+    return { settings: vSettings, subscription: vSubscription, language: vLanguage, "delete-account": vDeleteAcc }[name];
+  }
+
+  /* ---------- actions ---------- */
+  Object.assign(A, {
+    fchip: function (el) {
+      var s = el.getAttribute("data-s"), k = el.getAttribute("data-k"), v = el.getAttribute("data-v"), a = flt[s][k];
+      if (!v) a.length = 0; else { var i = a.indexOf(v); if (i > -1) a.splice(i, 1); else a.push(v); }
+      refreshFilter(s);
+    },
+    fclear: function (el) { var s = el.getAttribute("data-s"); ["cats", "countries", "durs", "ages"].forEach(function (k) { if (flt[s][k]) flt[s][k].length = 0; }); if (s === "lib") { lib.q = ""; var q = $("#lq"); if (q) q.value = ""; } refreshFilter(s); },
+    ftoggle: function (el) {
+      var s = el.getAttribute("data-s");
+      if (isNarrow()) { openFilterSheet(s); return; }
+      flt[s].open = !flt[s].open; saveOpen();
+      var wrap = $(s === "lib" ? "#lib2" : "#my2"); if (wrap) wrap.classList.toggle("fclosed", !flt[s].open);
+      var p = $("#fp-" + s); if (p) p.classList.toggle("closed", !flt[s].open);
+      $$('.fbtn[data-s="' + s + '"]').forEach(function (b) { b.classList.toggle("on", flt[s].open); });
+    },
+    lsheet: function () { openFilterSheet("lib"); },
+    mytab2: function (el) { my.tab = el.getAttribute("data-v"); my.sel = null; keepScroll(render); },
+    mreport: function (el) {
+      var s = getStory(el.getAttribute("data-id"));
+      dialog({ art: '<div class="ic">' + ic("flag", 30) + "</div>", title: "Report this story?", text: "Tell us what's wrong with “" + esc(s.t) + "”.", body: '<select class="ld-input" id="rp-r"><option>Inappropriate content</option><option>Wrong or broken audio</option><option>Spelling or grammar issue</option><option>Other</option></select>', ok: "Report", onOk: function () { toast("Thanks — our team will review this story."); } });
+    },
+    mdel2: function (el) {
+      var id = el.getAttribute("data-id"), m = st.mine.filter(function (x) { return x.id === id; })[0];
+      dialog({ art: '<div class="ic2 red">' + ic("trash", 34) + "</div>", danger: true, title: "Delete Story?", text: "Are you sure you want to delete “" + esc(m.title) + "”? This action cannot be undone.", ok: "Delete", onOk: function () {
+        st.mine = st.mine.filter(function (x) { return x.id !== id; }); st.favs = st.favs.filter(function (f) { return f !== id; }); st.recent = st.recent.filter(function (r) { return r.id !== id; }); delete st.progress[id];
+        save(); setTimeout(function () { if (route().parts[0] === "story") go("mystory"); else keepScroll(render); }); toast("Story deleted successfully.");
+      } });
+    },
+    selstart: function (el) { my.sel = [el.getAttribute("data-id")]; keepScroll(render); },
+    selrec: function (el) { var id = el.getAttribute("data-id"), i = my.sel.indexOf(id); if (i > -1) my.sel.splice(i, 1); else my.sel.push(id); keepScroll(render); },
+    selall: function () { my.sel = myRecList().map(function (s) { return s.id; }); keepScroll(render); },
+    selcancel: function () { my.sel = null; keepScroll(render); },
+    selremove: function () { var n = my.sel.length; st.recorded = (st.recorded || []).filter(function (id) { return my.sel.indexOf(id) < 0; }); my.sel = null; save(); keepScroll(render); toast(n > 1 ? "Story histories removed" : "Story history removed"); },
+    play2: function () {
+      var s = getStory(pl.id);
+      if (!hasAudio(s)) { svPick = null; go("select-voice?for=" + encodeURIComponent("story/" + s.id) + "&gen=1"); return; }
+      if (pl.playing) pause(); else { play(); st.recorded = st.recorded || []; if (st.recorded.indexOf(s.id) < 0) { st.recorded.unshift(s.id); save(); } }
+    },
+    share2: function (el) {
+      var s = getStory(el.getAttribute("data-id"));
+      if (s.mine && !s.pub) dialog({ art: '<div class="ic2 dark">' + ic("check", 26) + "</div>", title: "Share this story publicly?", text: "By continuing, this private story will become public so anyone with the link can read it (without audio). Shared pages may show story details such as title and related profile information (name/age) as applicable. Final terms wording will be updated later.<br><br>Do you agree to make this story public permanently?", ok: "Agree", onOk: function () { s.src.public = true; save(); setTimeout(function () { keepScroll(render); shareSheet(getStory(s.id)); }); } });
+      else shareSheet(s);
+    },
+    sounds: function () {
+      var el = overlay('<div class="dlg bsound"><div class="fs-head"><h3>Background Sounds</h3><button class="tx" data-x="c" aria-label="Close">' + ic("x", 16) + '</button></div><div class="bs-art">' + ic("music2", 56) + '</div><p>Background sounds are on the way!<br>Get ready to make your stories more immersive.</p><div class="ld-divider"></div><h4>Volume Media</h4><div class="bs-vol">' + ic("speaker", 20) + '<input type="range" min="0" max="100" value="' + (st.volume == null ? 100 : st.volume) + '" id="bsv"><b id="bsvv">' + (st.volume == null ? 100 : st.volume) + "%</b></div></div>", false, true);
+      el.classList.add("fs-ov");
+      el.querySelector('[data-x="c"]').onclick = closeOverlay;
+      $("#bsv", el).oninput = function () { st.volume = +this.value; $("#bsvv", el).textContent = this.value + "%"; save(); };
+    },
+    readfull: function () {
+      var s = getStory(pl.id);
+      var el = overlay('<div class="readfull"><div class="rf-head"><h2>Read Story</h2><button class="sv-x" data-x="c" aria-label="Close">' + ic("x", 20) + '</button></div><div class="rf-body"><b>' + esc(s.t) + "</b>" + s.text.map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") + "</div></div>", false);
+      el.classList.add("rf-ov"); el.querySelector('[data-x="c"]').onclick = closeOverlay;
+    },
+    pvoice: function () { svPick = null; go("select-voice?for=" + encodeURIComponent("story/" + pl.id)); },
+    svuse: function () {
+      if (!svPick) return;
+      var v = svPick, target = svFor;
+      progressSheet("Playing Your Voice...", "Sit tight! Your bedtime story voice is being prepared ⏳", 2600, function () {
+        var sid = target.indexOf("story/") === 0 ? target.slice(6) : null;
+        st.voice = v; if (sid) { st.audio = st.audio || {}; st.audio[sid] = v; txAdd("audio", "Audio Playback", -100); }
+        save(); svPick = null; toast("Voice audio generated successfully!"); go(target);
+        if (sid) setTimeout(function () { pl.id = sid; if (!pl.playing) A.play2(); }, 300);
+      });
+    },
+    // generate
+    gopt: function (el) { var f = el.getAttribute("data-f"), v = el.getAttribute("data-v"); g2.d[f] = f === "m" ? +v : v; keepScroll(render); },
+    gown: function () { g2.d.own = !g2.d.own; keepScroll(render); },
+    g2next: function () { if (!g2valid(g2.step)) return; g2.step++; render(); window.scrollTo(0, 0); },
+    g2back: function () { if (g2.step > 0) { g2.step--; render(); } else { g2 = { step: 0, d: null }; go("home"); } },
+    dictate2: function () {
+      var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { toast("Voice typing isn't supported in this browser"); return; }
+      var r = new SR(); r.lang = st.user.lang === "ID" ? "id-ID" : "en-US"; toast("Listening…");
+      r.onresult = function (e) { g2.d.about = (g2.d.about + " " + e.results[0][0].transcript).trim().slice(0, 500); keepScroll(render); };
+      r.start();
+    },
+    g2gen: function () {
+      if (st.coins < 1) { toast("Not enough coins — top up first"); go("topup"); return; }
+      dialog({ art: '<div class="coinart">' + coinStack(72) + "</div>", title: "Ready to Create<br>Your Story?", text: "This story uses <b>1 coins</b>. You'll have <b>" + (st.coins - 1) + " coins left</b>.", ok: "Continue", onOk: function () {
+        setTimeout(function () {
+          progressSheet("Creating Your Story...", "Sit tight! Your bedtime story voice is being prepared.", 3200, function () {
+            var d = g2.d, styleMap = { imaginative: "magical", gentle: "calm", playful: "funny", adventure: "adventurous", heartwarming: "calm", animal: "funny" };
+            var m = { id: uid("m"), name: d.name.trim(), age: d.age, about: d.about.trim(), listener: d.listener, style: styleMap[d.style] || "calm", type: "bedtime", cat: d.cat, m: d.m, voice: st.voice, title: d.title.trim(), setting: "", moral: d.own ? d.msg.trim() : d.lesson, cover: "jessica", public: false };
+            m.title = m.title || (m.name + "'s " + d.cat.split(" ")[0] + " Story"); m.text = D.genText(m); m.createdAt = m.updatedAt = Date.now();
+            st.mine.unshift(m); st.coins -= 1; txAdd("gen", "Generate Story", -1); notify("Your story is ready", "“" + m.title + "” is waiting in My Story.", "story/" + m.id);
+            g2 = { step: 0, d: null }; save(); toast("Story created — enjoy!"); go("story/" + m.id);
+          });
+        }, 50);
+      } });
+    },
+    // profile
+    vdel2: function (el) {
+      var id = el.getAttribute("data-id"), v = st.voices.filter(function (x) { return x.id === id; })[0];
+      dialog({ art: '<div class="ic2 red">' + ic("trash", 34) + "</div>", danger: true, title: "Delete Voice Recording?", text: "Are you sure you want to delete “" + esc(v.name) + "”? This action cannot be undone.", ok: "Delete", onOk: function () {
+        st.voices = st.voices.filter(function (x) { return x.id !== id; }); if (st.voice === id) st.voice = "wanda"; save(); setTimeout(function () { keepScroll(render); }); toast("Voice deleted successfully.");
+      } });
+    },
+    langpick: function (el) { langPick = el.getAttribute("data-v"); keepScroll(render); },
+    langgo: function () {
+      var l = LANGS.filter(function (x) { return x[0] === langPick; })[0];
+      var isID = st.user.lang === "ID";
+      dialog({ art: '<div class="micart">🎙️</div>', title: isID ? "Ubah bahasa ke " + l[1] + "?" : "Change language to " + l[1] + "?", text: isID ? "Anda bisa mengubah kembali bahasa di menu ini dan mungkin ada beberapa tulisan yang tidak berubah." : "You can change the language back in this menu, and some text may not change.", cancel: isID ? "Batal" : "Cancel", ok: isID ? "Lanjutkan" : "Continue", onOk: function () {
+        st.user.lang = langPick; save(); langPick = null; setTimeout(function () { go("profile"); }); toast((l[0] === "ID" ? "Language changed to Indonesian" : "Language changed to " + l[1]));
+      } });
+    },
+    txrange: function () { },
+    txtype: function (el) { TXF.type = el.getAttribute("data-v"); keepScroll(render); },
+    unsub: function () { dialog({ art: '<div class="ic2 red">' + ic("card", 30) + "</div>", danger: true, title: "Unsubscribe?", text: "You'll keep Super Premium benefits until Tue, Mar 16 2027. Demo only — nothing is charged.", ok: "Unsubscribe", onOk: function () { toast("Subscription will end on Mar 16 2027"); } }); },
+    downgrade: function () { dialog({ icon: "card", title: "Downgrade plan?", text: "Switch to Premium at your next billing date. Demo only — nothing is charged.", ok: "Downgrade", onOk: function () { st.user.plan = "premium"; save(); setTimeout(render); toast("Plan will change to Premium"); } }); },
+    avatarpick: function () { toast("Photo upload is available in the app"); },
+    delacc2: function () { st = seed(); save(); toast("Account deleted"); go("welcome"); },
+    signout: function () { dialog({ icon: "logout", title: "Sign out?", text: "Your demo data stays saved in this browser.", ok: "Sign Out", onOk: function () { st.authed = false; stopPlayer(); save(); setTimeout(function () { go("login"); }); } }); }
+  });
+  document.addEventListener("input", function (e) {
+    var t = e.target, f = t.getAttribute && t.getAttribute("data-g");
+    if (f && g2.d) { g2.d[f] = f === "age" ? +t.value : t.value; var c = $('[data-gc="' + f + '"]'); if (c) c.textContent = f === "age" ? t.value + " years old" : t.value.length + "/" + t.maxLength; g2refreshBtn(); }
+    if (t.id === "myq2") { my.q = t.value; $("#mygrid").innerHTML = myBody(); }
+    if (t.id === "lq") { lib.q = t.value; var b = $("#libbody"); if (b) b.innerHTML = libBody(); }
+    if (t.id === "dc2") { var b2 = $("#del2btn"); if (b2) b2.disabled = t.value.trim().toUpperCase() !== "DELETE"; }
+  });
+  document.addEventListener("change", function (e) {
+    var t = e.target;
+    if (t.getAttribute("data-g")) { g2.d[t.getAttribute("data-g")] = t.value; g2refreshBtn(); }
+    if (t.getAttribute("data-act") === "txrange") { TXF.range = t.value; keepScroll(render); }
+  });
+  document.addEventListener("submit", function (e) {
+    var f = e.target; if (f.getAttribute("data-form") !== "profile2") return; e.preventDefault(); e.stopImmediatePropagation();
+    var fd = new FormData(f), n = (fd.get("name") || "").trim();
+    if (!n) { $("#perr").textContent = "Please enter your full name."; return; }
+    st.user.name = n; st.user.age = fd.get("age"); st.user.gender = fd.get("gender"); st.user.phone = fd.get("phone"); save(); toast("Profile updated successfully."); go("profile");
+  }, true);
+  window.addEventListener("resize", function () { if (ovEl && ovEl.classList.contains("fs-ov") && !isNarrow() && $("#fsheet-body")) closeOverlay(); });
+  // seed extra demo data once
+  if (!st.tx) { var n0 = Date.now(); st.tx = [{ type: "gen", title: "Generate Story", amt: -1, at: n0 - 3 * 864e5 }, { type: "audio", title: "Audio Playback", amt: -100, at: n0 - 3 * 864e5 + 6e5 }, { type: "clone", title: "Voice Cloning", amt: -100, at: n0 - 6 * 864e5 }, { type: "gen", title: "Generate Story", amt: -1, at: n0 - 12 * 864e5 }, { type: "topup", title: "Top Up", amt: 500, at: n0 - 20 * 864e5 }, { type: "sub", title: "Subscription", amt: 4800, at: n0 - 40 * 864e5 }]; }
+  if (!st.recorded) st.recorded = ["alibaba", "beauty", "aladdin", "hansel"];
+  if (!st.audio) st.audio = { m1: "wanda" };
+  save();
+
+
+  /* ======================================================================
+     AUTH + RECORD VOICE — same content/assets as the app, responsive layout
+     ====================================================================== */
+  IMG.onb1 = "assets/onb-moon.png"; IMG.onb2 = "assets/onb-mic.png"; IMG.onb3 = "assets/onb-kid.png";
+  IMG.coins = "assets/coins.png"; IMG.micS = "assets/mic-small.png"; IMG.fairyS = "assets/fairy-small.png"; IMG.vwave = "assets/voice-wave.png"; IMG.reader = "assets/reader-ic.png";
+  SLIDES = [
+    ["onb1", "Welcome to LullaDream", "Create magical bed time story with your voice!"],
+    ["onb2", "Stories That Feel Like You", "Our AI turns your voice into endless tales — from gentle lullabies to wild space adventures."],
+    ["onb3", "Sweet Dreams Made Together", "Watch your child smile and drift off, comforted by stories told in your voice — anytime, anywhere."]
+  ];
+  function vWelcome() {
+    var s = SLIDES[auth.slide];
+    var h = '<div class="onb"><div class="onb-art" id="slideart"><img src="' + IMG[s[0]] + '" alt=""></div><div class="onb-tx"><h1 id="slidet">' + s[1] + '</h1><p id="slides">' + s[2] + '</p>' +
+      '<div class="onb-dots">' + SLIDES.map(function (x, i) { return '<button class="' + (i === auth.slide ? "on" : "") + '" data-act="slide" data-i="' + i + '" aria-label="Slide ' + (i + 1) + '"></button>'; }).join("") + "</div>" +
+      '<button class="ld-btn primary pill onb-btn" data-act="tryfree">Try For Free</button></div></div>';
+    return { bare: true, doc: "Welcome", html: '<div class="ld">' + h + "</div>", after: function () {
+      auth.slideT = setInterval(function () { auth.slide = (auth.slide + 1) % SLIDES.length; paintSlide(); }, 4500);
+      var x0 = null, el = $(".onb");
+      el.addEventListener("touchstart", function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+      el.addEventListener("touchend", function (e) { if (x0 == null) return; var dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) { auth.slide = (auth.slide + (dx < 0 ? 1 : SLIDES.length - 1)) % SLIDES.length; paintSlide(); } x0 = null; });
+    } };
+  }
+  function paintSlide() {
+    var s = SLIDES[auth.slide], a = $("#slideart"); if (!a) return;
+    a.innerHTML = '<img src="' + IMG[s[0]] + '" alt="">'; $("#slidet").textContent = s[1]; $("#slides").textContent = s[2];
+    $$(".onb-dots button").forEach(function (b, i) { b.classList.toggle("on", i === auth.slide); });
+  }
+  /* auth page: o.tone peach (logo header) | lav (back + title header); o.body form content; o.foot sticky footer */
+  function authPage(o) {
+    var head = o.tone === "lav"
+      ? '<header class="au-head lav"><button class="au-back" data-act="back" aria-label="Back">' + ic("back", 26) + "</button><h1>" + o.title + "</h1></header>"
+      : '<header class="au-head peach"><img src="' + IMG.logo + '" alt="LullaDream"></header>';
+    var side = '<aside class="au-side ' + (o.tone || "peach") + '"><img class="au-logo" src="' + IMG.logo + '" alt="LullaDream"><img class="au-ill" src="' + IMG[o.ill || "onb1"] + '" alt=""><p>' + (o.tag || "Create magical bed time story with your voice!") + "</p></aside>";
+    return { bare: true, doc: o.doc, html: '<div class="ld"><div class="au">' + side + '<main class="au-main"><form class="auth-form au-card" data-form="' + o.form + '"' + (o.need ? ' data-need="' + o.need + '"' : "") + ' novalidate>' + head +
+      '<div class="au-body">' + (o.tone === "lav" ? "" : '<div class="au-title"><h2>' + o.title + "</h2><p>" + o.sub + "</p></div>") + o.body + '</div><div class="au-foot"><div class="auth-err" id="aerr"></div>' + o.foot + "</div></form></main></div></div>", after: o.after };
+  }
+  function pwField(id, name, label, ph, ac) {
+    return '<div class="ld-field"><label for="' + id + '">' + label + ' <em>*</em></label><div class="pw"><input id="' + id + '" name="' + name + '" type="password" class="ld-input" placeholder="' + ph + '" autocomplete="' + ac + '"><button type="button" class="eye" data-act="eye" aria-label="Show password">' + ic("eye", 20) + "</button></div></div>";
+  }
+  var GOOGLE = '<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+  function vSignIn() {
+    return authPage({ doc: "Sign In", form: "login", need: "email,pw", title: "Welcome Back!", sub: "Let's pick up where your story left off, Dreamers! 🔮", ill: "onb1",
+      body: '<div class="ld-field"><label for="l-mail">Email <em>*</em></label><input id="l-mail" name="email" type="email" class="ld-input" placeholder="Input your email" autocomplete="email" value="' + esc(auth.email) + '"></div>' +
+        pwField("l-pw", "pw", "Password", "Input your password", "current-password") + '<a class="au-link right" data-go="forgot">Forgot Password?</a>' +
+        '<div class="auth-or"><span>OR LOG IN WITH</span></div><button type="button" class="ld-btn block google" data-act="google">' + GOOGLE + "Log In With Google</button>",
+      foot: '<button class="ld-btn primary pill block" type="submit" disabled>Sign In</button><p class="auth-alt">Don\'t have an account? <a data-go="signup">Sign Up</a></p>' });
+  }
+  function vSignUp() {
+    return authPage({ doc: "Sign Up", form: "signup", need: "name,email,phone,pw,pw2", title: "Let's Get Started", sub: "Start creating magical bedtime moments here 💭", ill: "onb3",
+      body: '<div class="au-grid"><div class="ld-field full"><label for="s-name">Full Name <em>*</em></label><input id="s-name" name="name" class="ld-input" placeholder="Input your full name" autocomplete="name" maxlength="40"></div>' +
+        '<div class="ld-field"><label for="s-mail">Email <em>*</em></label><input id="s-mail" name="email" type="email" class="ld-input" placeholder="Input your email" autocomplete="email"></div>' +
+        '<div class="ld-field"><label for="s-phone">Phone Number <em>*</em></label><div class="phone"><select name="cc" aria-label="Country code"><option value="+62">🇮🇩</option><option value="+60">🇲🇾</option><option value="+65">🇸🇬</option><option value="+1">🇺🇸</option></select><span class="cc" id="ccv">+62</span><input id="s-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="14"></div></div>' +
+        pwField("s-pw", "pw", "Password", "Input your password", "new-password") + pwField("s-pw2", "pw2", "Confirm Password", "Confirm your password", "new-password") + "</div>",
+      foot: '<button class="ld-btn primary pill block" type="submit" disabled>Continue</button><p class="auth-alt">Already have an account? <a data-go="login">Sign In</a></p>' });
+  }
+  function vForgot() {
+    return authPage({ doc: "Forgot Password", form: "forgot", need: "email", tone: "lav", title: "Forgot Password", ill: "onb2", tag: "Don't worry — we'll help you get back to your stories.",
+      body: '<p class="au-desc">Please enter your email and we will send an OTP code in the next step to reset your password</p><div class="ld-field"><label for="f-mail">Email <em>*</em></label><input id="f-mail" name="email" type="email" class="ld-input" placeholder="Enter your email" autocomplete="email" value="' + esc(auth.email) + '"></div>',
+      foot: '<button class="ld-btn primary pill block" type="submit" disabled>Continue</button><p class="auth-alt">Remember your password? <a data-go="login">Back to Login</a></p>' });
+  }
+  function vOtp() {
+    if (!auth.email) { location.replace("#/" + (auth.mode === "forgot" ? "forgot" : "signup")); return { bare: true, html: "" }; }
+    return authPage({ doc: "OTP Verification", form: "otp", tone: "lav", title: "OTP Code Verification", ill: "onb2", tag: "One more step and your dreams begin.",
+      body: '<p class="au-desc">We have an OTP code to your email and <a class="au-mail">' + esc(auth.email) + '</a> Enter the OTP code below to verify</p><div class="otp" role="group" aria-label="OTP code">' + [0, 1, 2, 3, 4, 5].map(function (i) { return '<input inputmode="numeric" maxlength="1" autocomplete="' + (i ? "off" : "one-time-code") + '" aria-label="Digit ' + (i + 1) + '" data-otp="' + i + '">'; }).join("") + "</div>" +
+        '<div class="otp-re"><p>Didn\'t receive email?</p><p id="otpre"></p></div>',
+      foot: '<button class="ld-btn primary pill block" type="submit" disabled>Continue</button>',
+      after: function () { startOtpTimer(); var f = $('[data-otp="0"]'); if (f) f.focus(); } });
+  }
+  function startOtpTimer() {
+    clearInterval(auth.otpT); auth.left = 60;
+    function paint() { var e = $("#otpre"); if (!e) return clearInterval(auth.otpT); e.innerHTML = auth.left > 0 ? 'You can resend code in <b>' + auth.left + " s</b>" : '<a data-act="resend">Resend code</a>'; }
+    paint(); auth.otpT = setInterval(function () { auth.left--; paint(); if (auth.left <= 0) clearInterval(auth.otpT); }, 1000);
+  }
+  function vReset() {
+    if (!auth.email) { location.replace("#/forgot"); return { bare: true, html: "" }; }
+    return authPage({ doc: "New Password", form: "reset", need: "pw,pw2", tone: "lav", title: "Create New Password", ill: "onb2",
+      body: '<p class="au-desc">Your new password must be different from the previous one.</p>' + pwField("r-pw", "pw", "New Password", "Input your password", "new-password") + pwField("r-pw2", "pw2", "Confirm Password", "Confirm your password", "new-password"),
+      foot: '<button class="ld-btn primary pill block" type="submit" disabled>Save Password</button>' });
+  }
+  function vAuth(name) { return { welcome: vWelcome, login: vSignIn, signup: vSignUp, forgot: vForgot, otp: vOtp, reset: vReset }[name](); }
+  A.resend = function () { startOtpTimer(); toast("If your email is registered, you will receive a new OTP shortly."); };
+  document.addEventListener("change", function (e) { if (e.target.name === "cc") { var c = $("#ccv"); if (c) c.textContent = e.target.value; } });
+  window.addEventListener("hashchange", function () { if (/^#\/otp/.test(location.hash) && auth.mode === "forgot") setTimeout(function () { toast("If your email is registered, you will receive a new OTP shortly."); }, 100); });
+
+  /* ---------- sheet helper: bottom sheet on mobile, centered card on tablet/desktop ---------- */
+  function sheet(inner, cls) {
+    var el = overlay('<div class="bsheet ' + (cls || "") + '" role="dialog" aria-modal="true"><button class="bs-x" data-x="c" aria-label="Close">' + ic("x", 14) + "</button>" + inner + "</div>", true);
+    el.classList.add("bs-ov");
+    el.querySelector('[data-x="c"]').onclick = function () { closeOverlay(); };
+    return el;
+  }
+
+  /* ---------- New voice flow: Ready to Record → name → consent → Record Voice page ---------- */
+  var nv = { name: "", data: null, sec: 0, back: "voices" };
+  function startVoiceFlow() {
+    nv = { name: "", data: null, sec: 0, back: location.hash.replace(/^#\//, "") || "voices" };
+    if (st.coins < 100) { toast("You need 100 coins for a new voice"); go("topup"); return; }
+    dialog({ art: '<div class="coinart"><img src="' + IMG.coins + '" alt="" style="width:64px"></div>', title: "Ready to Record?", text: "Adding your voice uses <b>100 coins</b>. You'll have <b>" + (st.coins - 100) + " coins left</b>.", ok: "Continue", onOk: function () { setTimeout(nameSheet, 30); } });
+  }
+  function nameSheet() {
+    var el = sheet('<div class="nv-av"><span>' + ic("user", 40) + '</span><i>' + ic("edit", 12) + '</i></div><input class="ld-input" id="nv-name" maxlength="20" placeholder="Enter a name for your voice" value="' + esc(nv.name) + '"><div class="bs-foot"><button class="ld-btn pill block primary" id="nv-go" disabled>Continue</button></div>');
+    var i = $("#nv-name", el), b = $("#nv-go", el);
+    i.oninput = function () { b.disabled = !i.value.trim(); }; i.oninput(); setTimeout(function () { i.focus(); }, 50);
+    i.onkeydown = function (e) { if (e.key === "Enter" && !b.disabled) b.click(); };
+    b.onclick = function () { nv.name = i.value.trim(); closeOverlay(); consentSheet(); };
+  }
+  function consentSheet() {
+    var el = sheet('<img class="bs-art" src="' + IMG.micS + '" alt=""><h3>Allow your voice to be cloned?</h3><p>Your voice will be used to generate story narration. Explicit consent is required before processing the recording.</p>' +
+      '<label class="nv-agree"><input type="checkbox" id="nv-ok"><span class="rc">' + ic("check", 12) + "</span>I agree to have my voice recorded and used for voice cloning in this application.</label><div class=\"bs-foot\"><button class=\"ld-btn pill block primary\" id=\"nv-go\" disabled>Continue Recording Voice</button></div>");
+    var c = $("#nv-ok", el), b = $("#nv-go", el);
+    c.onchange = function () { b.disabled = !c.checked; };
+    b.onclick = function () { closeOverlay(); go("record-voice"); };
+  }
+  var rv = { state: "idle", t: null, sec: 0, mr: null, stream: null, chunks: [], paused: false };
+  var REC_TEXT = "The night is calm, the world is quiet, and it's time to rest. As you listen, imagine the softest clouds carrying you to a land of dreams. Let's begin our story.";
+  function vRecordVoice() {
+    if (!nv.name) { setTimeout(function () { go("voices"); }); return { active: "profile", html: "" }; }
+    var h = '<section class="rvp"><header class="sv-head"><h1>Record Voice</h1><button class="sv-x" data-act="rvclose" aria-label="Close">' + ic("x", 20) + '</button></header><div class="rv-body"><div class="rv-left"><div class="rv-info"><img src="' + IMG.reader + '" alt=""><p>To record your voice, read the words shown on the screen. Click the record button below and make sure to speak clearly for a smooth and natural narration</p></div>' +
+      '<p class="rv-script">' + REC_TEXT + '</p></div><div class="rv-ctrl" id="rvctrl">' + rvCtrl() + "</div></div></section>";
+    return { active: "profile", title: "", html: h, doc: "Record Voice" };
+  }
+  function rvCtrl() {
+    var bars = ""; for (var i = 0; i < 20; i++) bars += "<i></i>";
+    if (rv.state === "idle") return '<div class="rv-wave idle">' + bars + '</div><div class="rv-row"><span>Click To Record</span><button class="rv-btn mic" data-act="rvstart" aria-label="Start recording">' + ic("mic", 22) + "</button></div>";
+    return '<b class="rv-time" id="rvtime">' + mmss(rv.sec).padStart(5, "0") + '</b><div class="rv-wave' + (rv.paused ? " idle" : "") + '">' + bars + '</div><div class="rv-row"><span>' + (rv.paused ? "Paused" : "Recording...") + '</span><button class="rv-btn pause" data-act="rvpause" aria-label="Pause">' + ic(rv.paused ? "mic" : "pause", 18) + '</button><button class="rv-btn stop" data-act="rvstop" aria-label="Stop">' + ic("stop", 20) + "</button></div>";
+  }
+  function rvPaint() { var c = $("#rvctrl"); if (c) c.innerHTML = rvCtrl(); }
+  function rvTick() { if (!rv.paused) { rv.sec++; var t = $("#rvtime"); if (t) t.textContent = mmss(rv.sec).padStart(5, "0"); if (rv.sec >= 60) A.rvstop(); } }
+  function rvCleanup() { clearInterval(rv.t); try { if (rv.mr && rv.mr.state !== "inactive") rv.mr.stop(); } catch (e) { } if (rv.stream) rv.stream.getTracks().forEach(function (t) { t.stop(); }); rv.stream = null; }
+  function listenSheet() {
+    var dur = Math.max(1, rv.sec), audio = nv.data ? new Audio(nv.data) : null, pos = 0, iv = null;
+    var el = sheet('<h3 class="ls-t">Take a quick listen to how your voice sounds in the story 🎤</h3><div class="ls-player"><button class="rv-btn play" id="lsplay" aria-label="Play">' + ic("play", 22) + '</button><div class="ls-bar"><i id="lsbar"></i></div><div class="ls-time"><span id="lscur">00:00</span><span>' + mmss(dur).padStart(5, "0") + "</span></div></div>" +
+      '<div class="bs-foot two"><button class="ld-btn pill cancel2" id="lsre">' + ic("mic", 16) + 'Retake</button><button class="ld-btn pill primary" id="lsok">Create Voice</button></div>');
+    function stopP() { clearInterval(iv); iv = null; if (audio) audio.pause(); $("#lsplay", el).innerHTML = ic("play", 22); }
+    $("#lsplay", el).onclick = function () {
+      if (iv) return stopP();
+      if (audio) { audio.currentTime = pos; audio.play().catch(function () { }); }
+      $("#lsplay", el).innerHTML = ic("pause", 22);
+      iv = setInterval(function () { pos += .25; if (pos >= dur) { pos = 0; stopP(); } var b = $("#lsbar"); if (b) b.style.width = (pos / dur * 100) + "%"; var c = $("#lscur"); if (c) c.textContent = mmss(pos).padStart(5, "0"); }, 250);
+    };
+    $("#lsre", el).onclick = function () { stopP(); closeOverlay(); rv.state = "idle"; rv.sec = 0; nv.data = null; rvPaint(); };
+    $("#lsok", el).onclick = function () {
+      stopP(); closeOverlay();
+      progressSheet2('<img src="' + IMG.vwave + '" alt="" style="width:48px">', "Creating Your Voice...", "Sit tight! Your bedtime story voice is being prepared⏳", 3000, function () {
+        var v = { id: uid("v"), name: nv.name, at: Date.now() }; if (nv.data && nv.data.length < 1.5e6) v.audio = nv.data;
+        st.voices.push(v); st.coins -= 100; txAdd("clone", "Voice Cloning", -100); save();
+        rv.state = "idle"; rv.sec = 0; toast("Voice created successfully!");
+        var back = nv.back; nv = { name: "" };
+        if (back.indexOf("select-voice") === 0) { svPick = v.id; }
+        go(back);
+      });
+    };
+  }
+  function progressSheet2(art, title, text, ms, done) {
+    var el = overlay('<div class="psheet">' + art + "<h3>" + title + "</h3><p>" + text + '</p><div class="bar"><i id="psb"></i></div><small id="psp">0%</small></div>', true);
+    el.classList.add("ps-ov");
+    var k = 0, steps = 25, iv = setInterval(function () {
+      k++; var v = Math.min(100, Math.round(k / steps * 100)); var b = $("#psb"); if (b) b.style.width = v + "%"; var t = $("#psp"); if (t) t.textContent = v + "%";
+      if (k >= steps) { clearInterval(iv); setTimeout(function () { closeOverlay(); done(); }, 250); }
+    }, ms / steps);
+  }
+  Object.assign(A, {
+    vnew: startVoiceFlow,
+    rvclose: function () { rvCleanup(); rv.state = "idle"; rv.sec = 0; var b = nv.back; nv = { name: "" }; go(b || "voices"); },
+    rvstart: function () {
+      rv.state = "rec"; rv.sec = 0; rv.paused = false; rv.chunks = []; nv.data = null; rvPaint();
+      clearInterval(rv.t); rv.t = setInterval(rvTick, 1000);
+      if (navigator.mediaDevices && window.MediaRecorder) navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
+        if (rv.state !== "rec") { s.getTracks().forEach(function (t) { t.stop(); }); return; }
+        rv.stream = s; rv.mr = new MediaRecorder(s); rv.mr.ondataavailable = function (e) { rv.chunks.push(e.data); };
+        rv.mr.onstop = function () { var b = new Blob(rv.chunks, { type: rv.mr.mimeType || "audio/webm" }); var fr = new FileReader(); fr.onload = function () { nv.data = fr.result; }; fr.readAsDataURL(b); };
+        rv.mr.start();
+      }).catch(function () { toast("Microphone not available — recording is simulated"); });
+    },
+    rvpause: function () { rv.paused = !rv.paused; try { if (rv.mr) rv.paused ? rv.mr.pause() : rv.mr.resume(); } catch (e) { } rvPaint(); },
+    rvstop: function () { if (rv.state !== "rec") return; rv.state = "done"; clearInterval(rv.t); rvCleanup(); if (rv.sec < 1) rv.sec = 1; setTimeout(listenSheet, 300); }
+  });
+  /* story finished → "Storytime Complete!" */
+  function tick() {
+    var s = getStory(pl.id); if (!s) return stopPlayer();
+    var now = Date.now(), dur = s.m * 60, p = (st.progress[s.id] || 0) + (now - pl.last) / 1000; pl.last = now;
+    if (p >= dur) { st.progress[s.id] = dur; pause(); storyDone(); return; }
+    st.progress[s.id] = p;
+    if (st.timerEnd && now >= st.timerEnd) { st.timerEnd = 0; pause(); toast("Sleep timer ended — goodnight!"); return; }
+    if (++pl.tick % 8 === 0) save();
+    updPlayer();
+  }
+  function storyDone() {
+    var el = overlay('<div class="dlg dlg2 done2"><button class="bs-x" data-x="c" aria-label="Close">' + ic("x", 14) + '</button><img src="' + IMG.fairyS + '" alt="" style="width:64px;margin:0 auto"><h3>Storytime<br>Complete!</h3><p>Thank you for joining this magical moment. Shall we find your next favorite?</p><button class="ld-btn primary pill block" data-x="lib">Pick Another Story</button><button class="ld-btn cancel2 pill block" data-x="home">Back to Home</button></div>');
+    el.querySelector('[data-x="c"]').onclick = closeOverlay;
+    el.querySelector('[data-x="lib"]').onclick = function () { closeOverlay(); go("library"); };
+    el.querySelector('[data-x="home"]').onclick = function () { closeOverlay(); go("home"); };
+  }
+  function routeExtra(name) {
+    return { settings: vSettings, subscription: vSubscription, language: vLanguage, "delete-account": vDeleteAcc, "record-voice": vRecordVoice }[name];
+  }
+  window.addEventListener("hashchange", function () { if (!/record-voice/.test(location.hash) && rv.state === "rec") { rvCleanup(); rv.state = "idle"; } });
+
   function keepScroll(fn) { var y = window.scrollY, tr = $$(".track").map(function (t) { return t.scrollLeft; }); fn(); window.scrollTo(0, y); $$(".track").forEach(function (t, i) { t.scrollLeft = tr[i] || 0; }); }
 
   document.addEventListener("click", function (e) {
