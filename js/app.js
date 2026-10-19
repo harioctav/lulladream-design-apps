@@ -1032,7 +1032,7 @@
     h += '<div class="ld-spacer"></div>';
     var u = unread();
     h += '<button class="ld-iconbtn" data-go="notifications" aria-label="Notifications">' + ic("bell", 20) + (u ? '<span class="ld-dot">' + u + "</span>" : "") + "</button>";
-    h += '<button class="ld-coin" data-go="topup" aria-label="Coins"><i></i>' + short(st.coins) + "</button>";
+    h += '<button class="ld-coin" ' + (st.coins < 100 ? 'data-act="lowcoins"' : 'data-go="topup"') + ' aria-label="Coins"><i></i>' + short(st.coins) + "</button>";
     h += '<span class="ld-userchip" data-go="profile"><span class="ld-avatar" style="width:40px;height:40px"><img src="' + IMG.avatar + '" alt=""></span><span><b>' + esc(st.user.name) + "</b><small>" + planName(st.user.plan) + "</small></span></span>";
     return h + "</header>";
   }
@@ -1309,7 +1309,7 @@
     var ico = { gen: "doc", clone: "mic", audio: "play", topup: "topup", sub: "card" };
     var h = subhead(PT("recent")) + '<section class="tx2"><div class="tx2-bar"><label class="tx2-date">' + ic("cal", 18) + '<select data-act="txrange" aria-label="Filter by date range"><option value="all"' + (TXF.range === "all" ? " selected" : "") + '>Filter by Date Range</option><option value="d7"' + (TXF.range === "d7" ? " selected" : "") + '>Last 7 days</option><option value="d30"' + (TXF.range === "d30" ? " selected" : "") + ">Last 30 days</option></select></label>" +
       '<div class="tx2-chips">' + TXTYPES.map(function (t) { return '<button class="fchip' + (TXF.type === t[0] ? " on" : "") + '" data-act="txtype" data-v="' + t[0] + '">' + t[1] + "</button>"; }).join("") + "</div></div>" +
-      (list.length ? '<div class="tx2-list">' + list.map(function (t) { var d = new Date(t.at); return '<div class="ld-panel tx2-row"><span class="ic">' + ic(ico[t.type] || "doc", 20) + '</span><span class="tb"><b>' + esc(t.title) + "</b><small>" + d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + ", " + d.toTimeString().slice(0, 5) + '</small></span><span class="amt' + (t.amt > 0 ? " plus" : "") + '">' + (t.amt > 0 ? "+" : "") + t.amt + "</span>" + ic("next", 16) + "</div>"; }).join("") + '</div><p class="ld-muted tx2-end">You\'ve reached the end of the list</p>'
+      (list.length ? '<div class="tx2-list">' + list.map(function (t) { var d = new Date(t.at); return '<div class="ld-panel tx2-row" data-go="transaction/' + st.tx.indexOf(t) + '" role="button" tabindex="0"><span class="ic">' + ic(ico[t.type] || "doc", 20) + '</span><span class="tb"><b>' + esc(t.title) + "</b><small>" + d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + ", " + d.toTimeString().slice(0, 5) + '</small></span><span class="amt' + (t.amt > 0 ? " plus" : "") + '">' + (t.amt > 0 ? "+" : "") + t.amt + "</span>" + ic("next", 16) + "</div>"; }).join("") + '</div><p class="ld-muted tx2-end">You\'ve reached the end of the list</p>'
         : '<p class="ld-muted tx2-end">No transactions match your current filters</p>') + "</section>";
     return { active: "profile", title: "", html: h, doc: PT("recent") };
   }
@@ -1446,7 +1446,7 @@
       r.start();
     },
     g2gen: function () {
-      if (st.coins < 1) { toast("Not enough coins — top up first"); go("topup"); return; }
+      if (st.coins < 1) { lowCoins(); return; }
       dialog({ art: '<div class="coinart">' + coinStack(72) + "</div>", title: "Ready to Create<br>Your Story?", text: "This story uses <b>1 coins</b>. You'll have <b>" + (st.coins - 1) + " coins left</b>.", ok: "Continue", onOk: function () {
         setTimeout(function () {
           progressSheet("Creating Your Story...", "Sit tight! Your bedtime story voice is being prepared.", 3200, function () {
@@ -1604,7 +1604,7 @@
   var nv = { name: "", data: null, sec: 0, back: "voices" };
   function startVoiceFlow() {
     nv = { name: "", data: null, sec: 0, back: location.hash.replace(/^#\//, "") || "voices" };
-    if (st.coins < 100) { toast("You need 100 coins for a new voice"); go("topup"); return; }
+    if (st.coins < 100) { lowCoins(); return; }
     dialog({ art: '<div class="coinart"><img src="' + IMG.coins + '" alt="" style="width:64px"></div>', title: "Ready to Record?", text: "Adding your voice uses <b>100 coins</b>. You'll have <b>" + (st.coins - 100) + " coins left</b>.", ok: "Continue", onOk: function () { setTimeout(nameSheet, 30); } });
   }
   function nameSheet() {
@@ -1706,6 +1706,177 @@
   }
   window.addEventListener("hashchange", function () { if (!/record-voice/.test(location.hash) && rv.state === "rec") { rvCleanup(); rv.state = "idle"; } });
 
+
+  /* ---------- Transaction detail (from Recent Activity) ---------- */
+  var TXNAME = { gen: "Generate Story", clone: "Voice Cloning", audio: "Audio Playback", topup: "Top Up", sub: "Subscription" };
+  var TXDESC = { gen: "Coins used to generate a new bedtime story.", clone: "Coins used to create a new voice recording.", audio: "Coins used to generate story narration audio.", topup: "Coins added to your balance.", sub: "Coins included with your Super Premium subscription." };
+  function vTxDetail(i) {
+    var t = (st.tx || [])[+i]; if (!t) return vNotFound();
+    var ico = { gen: "doc", clone: "mic", audio: "play", topup: "topup", sub: "card" }[t.type] || "doc";
+    var d = new Date(t.at), date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + ", " + d.toTimeString().slice(0, 5);
+    var tid = "TRX-" + d.getFullYear() + ("0" + (d.getMonth() + 1)).slice(-2) + ("0" + d.getDate()).slice(-2) + "-" + String(t.at).slice(-6);
+    var after = st.coins; for (var k = 0; k < +i; k++) after -= st.tx[k].amt;
+    var before = after - t.amt;
+    var story = t.story || (t.type === "gen" || t.type === "audio" ? (st.mine[0] ? st.mine[0].title : "The Girl Seeking A Beautiful Sky") : null);
+    var voice = t.type === "clone" ? (t.voice || (st.voices[st.voices.length - 1] || {}).name) : t.type === "audio" ? voiceName(st.voice) : null;
+    function row(l, v, cls) { return '<div class="txd-row"><span>' + l + '</span><b class="' + (cls || "") + '">' + v + "</b></div>"; }
+    var h = subhead("Transaction Detail") + '<section class="txd"><div class="ld-panel txd-head"><span class="ic">' + ic(ico, 28) + '</span><small>' + esc(TXNAME[t.type] || t.title) + '</small><strong class="' + (t.amt > 0 ? "plus" : "minus") + '">' + (t.amt > 0 ? "+" : "") + num(t.amt) + ' Coins</strong><span class="txd-ok">' + ic("check", 14) + "Success</span><p>" + TXDESC[t.type] + "</p></div>" +
+      '<div class="ld-panel txd-list"><h3>Transaction Information</h3>' + row("Transaction ID", tid) + row("Transaction Type", esc(TXNAME[t.type] || t.title)) + row("Date &amp; Time", date) + (story ? row("Story", esc(story)) : "") + (voice ? row("Voice", esc(voice)) : "") +
+      row("Status", "Success", "ok") + '<div class="txd-sep"></div><h3>Coin Summary</h3>' + row("Balance Before", num(before) + " Coins") + row(t.amt > 0 ? "Coins Added" : "Coins Used", (t.amt > 0 ? "+" : "") + num(t.amt) + " Coins", t.amt > 0 ? "plus" : "minus") + row("Balance After", num(after) + " Coins", "strong") + "</div>" +
+      '<div class="txd-btns"><button class="ld-btn pill cancel2" data-act="copytid" data-v="' + tid + '">' + ic("doc", 16) + 'Copy Transaction ID</button><a class="ld-btn pill primary" data-go="help/support">' + ic("headset", 16) + "Need Help?</a></div></section>";
+    return { active: "profile", title: "", html: h, doc: "Transaction Detail" };
+  }
+  A.copytid = function (el) { var v = el.getAttribute("data-v"); (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(function () { toast("Transaction ID copied"); }, function () { toast(v); }); };
+  var _routeExtra2 = routeExtra;
+  routeExtra = function (name) { if (name === "transaction") return function () { return vTxDetail(route().parts[1]); }; return _routeExtra2(name); };
+  document.addEventListener("keydown", function (e) { if (e.key === "Enter" && e.target.classList && e.target.classList.contains("tx2-row")) e.target.click(); });
+
+  /* ---------- Running low on coins → Subscription Plans ---------- */
+  function lowCoins() {
+    var el = overlay('<div class="dlg dlg2 low2" role="dialog" aria-modal="true"><button class="bs-x" data-x="c" aria-label="Close">' + ic("x", 14) + '</button><img src="' + IMG.coins + '" alt="" class="low2-art"><h3>Running low on coins?</h3><p>Start a <b>7-day free trial</b> of <b>Super Premium</b>, create more stories and unlock voice cloning!</p><button class="ld-btn primary pill block" data-x="go">Get Start 7-day free trial</button></div>');
+    el.querySelector('[data-x="c"]').onclick = closeOverlay;
+    el.querySelector('[data-x="go"]').onclick = function () { closeOverlay(); plansSt.sel = "super"; go("plans"); };
+  }
+  var plansSt = { cycle: "monthly", sel: null, agree: false };
+  var PLANS2 = {
+    monthly: [
+      { id: "premium", name: "Premium", off: 55, was: "4.95", now: "2.20", desc: "Unlock the full story library and create magical bedtime stories for your child.", feats: [["Unlimited", " Bedtime Stories"], ["Unlimited", " Voice Templates"], ["Get 100 coins", " to create custom stories"]] },
+      { id: "super", name: "Super Premium", off: 58, was: "9.35", now: "0.00", best: true, trial: "7-Day Free trial", then: "Then USD 3.85/month. Cancel anytime.", desc: "Take storytelling to the next level with full creative control.", feats: [["Includes", " all Premium features"], ["Get 400 coins", " to creating custom stories and voice cloning", true]] }
+    ],
+    yearly: [
+      { id: "premium", name: "Premium", off: 60, was: "59.40", now: "23.76", desc: "Unlock the full story library and create magical bedtime stories for your child.", feats: [["Unlimited", " Bedtime Stories"], ["Unlimited", " Voice Templates"], ["Get 1200 coins", " to create custom stories"]] },
+      { id: "super", name: "Super Premium", off: 58, was: "112.20", now: "0.00", best: true, trial: "7-Day Free trial", then: "Then USD 46.20/year. Cancel anytime.", desc: "Take storytelling to the next level with full creative control.", feats: [["Includes", " all Premium features"], ["Get 4800 coins", " to creating custom stories and voice cloning", true]] }
+    ]
+  };
+  function vPlans() {
+    var list = PLANS2[plansSt.cycle], sel = list.filter(function (p) { return p.id === plansSt.sel; })[0];
+    var h = subhead("Subscription Plans") + '<section class="pl2"><div class="pl2-seg"><button class="' + (plansSt.cycle === "monthly" ? "on" : "") + '" data-act="plcycle" data-v="monthly">Monthly</button><button class="' + (plansSt.cycle === "yearly" ? "on" : "") + '" data-act="plcycle" data-v="yearly">Yearly</button></div>' +
+      '<div class="pl2-grid">' + list.map(function (p) {
+        return '<button class="pl2-card' + (plansSt.sel === p.id ? " on" : "") + '" data-act="plsel" data-v="' + p.id + '">' + (p.best ? '<span class="pl2-best">Best Value!</span>' : "") + (plansSt.sel === p.id ? '<span class="pl2-ck">' + ic("check", 13) + "</span>" : "") +
+          '<div class="pl2-top"><span class="pl2-off">🔥 ' + p.off + '% OFF</span><b>' + p.name + "</b></div>" + (p.trial ? '<small class="pl2-trial">' + p.trial + "</small>" : "") +
+          '<div class="pl2-price"><s>USD ' + p.was + "</s><strong>USD " + p.now + "</strong></div>" + (p.then ? '<em class="pl2-then">' + p.then + "</em>" : "") + '<p class="pl2-desc">' + p.desc + "</p>" +
+          '<ul>' + p.feats.map(function (f) { return "<li>" + (f[2] ? '<span class="pl2-ex">Exclusive!</span>' : '<span class="ck">' + ic("check", 12) + "</span>") + "<span><b>" + f[0] + "</b>" + f[1] + "</span></li>"; }).join("") + "</ul></button>";
+      }).join("") + "</div>" +
+      '<div class="pl2-foot"><label class="pl2-agree"><input type="checkbox" data-act="plagree"' + (plansSt.agree ? " checked" : "") + '> I agree to <a data-go="help/terms">terms and conditions</a></label><button class="ld-btn primary pill block" data-act="plgo"' + (sel && plansSt.agree ? "" : " disabled") + ">" + (sel ? "Continue" : "Select a Plan to Continue") + "</button></div></section>";
+    return { active: "profile", title: "", html: h, doc: "Subscription Plans" };
+  }
+  Object.assign(A, {
+    lowcoins: function () { lowCoins(); },
+    plcycle: function (el) { plansSt.cycle = el.getAttribute("data-v"); keepScroll(render); },
+    plsel: function (el) { plansSt.sel = el.getAttribute("data-v"); keepScroll(render); },
+    plgo: function () {
+      var p = PLANS2[plansSt.cycle].filter(function (x) { return x.id === plansSt.sel; })[0]; if (!p || !plansSt.agree) return;
+      payMethods(p);
+
+    }
+  });
+  document.addEventListener("change", function (e) { if (e.target.getAttribute && e.target.getAttribute("data-act") === "plagree") { plansSt.agree = e.target.checked; keepScroll(render); } });
+
+  /* ---------- Select Payments Methods ---------- */
+  P.wallet = '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 9.5h13a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2H3"/><circle cx="15.5" cy="12" r="1"/>';
+  P.va = '<rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M3 10h18M7 14.5h3M13 14.5h1"/>';
+  P.bank = '<path d="M3 9.5 12 4l9 5.5M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>';
+  var PAYS = [
+    ["wallet", "E-Wallet", "wallet", ["QRIS", "GoPay", "OVO", "DANA", "ShopeePay"]],
+    ["va", "Virtual Account", "va", ["BCA Virtual Account", "BNI Virtual Account", "BRI Virtual Account", "Mandiri Virtual Account", "Permata Virtual Account"]],
+    ["bank", "Online Bank Transfer", "bank", ["BCA KlikPay", "Mandiri Online", "CIMB Clicks", "Danamon Online"]],
+    ["card", "Credit Card", "card", null]
+  ];
+  function payMethods(plan) {
+    var open = null, pick = null;
+    var el = overlay('<div class="pay2" role="dialog" aria-modal="true"><div class="pay2-head"><h3>Select Payments Methods</h3><button class="bs-x" data-x="c" aria-label="Close">' + ic("x", 14) + '</button></div><div class="pay2-body" id="paybody"></div><div class="pay2-foot"><button class="ld-btn primary pill block" id="payuse" disabled>Use Payment</button></div></div>', false);
+    el.classList.add("pay-ov");
+    function paint() {
+      $("#paybody", el).innerHTML = PAYS.map(function (g) {
+        var isOpen = open === g[0], has = g[3] && g[3].indexOf(pick) > -1, cardOn = !g[3] && pick === "Credit Card";
+        return '<div class="pay2-grp' + (isOpen ? " open" : "") + (has || cardOn ? " sel" : "") + '"><button class="pay2-row" data-g="' + g[0] + '"><span class="pic">' + ic(g[2], 22) + "</span><span class=\"pt\">" + g[1] + (has ? "<small>" + esc(pick) + "</small>" : "") + "</span>" + (cardOn ? '<span class="pay2-rc on">' + ic("check", 12) + "</span>" : ic(g[3] ? "down" : "next", 18)) + "</button>" +
+          (g[3] && isOpen ? '<div class="pay2-opts">' + g[3].map(function (o) { return '<button class="pay2-opt' + (pick === o ? " on" : "") + '" data-o="' + esc(o) + '"><span>' + esc(o) + '</span><span class="pay2-rc">' + (pick === o ? ic("check", 12) : "") + "</span></button>"; }).join("") + "</div>" : "") + "</div>";
+      }).join("");
+      $("#payuse", el).disabled = !pick;
+      $$(".pay2-row", el).forEach(function (b) { b.onclick = function () { var g = b.getAttribute("data-g"); if (g === "card") { pick = "Credit Card"; open = null; } else open = open === g ? null : g; paint(); }; });
+      $$(".pay2-opt", el).forEach(function (b) { b.onclick = function () { pick = b.getAttribute("data-o"); paint(); }; });
+    }
+    paint();
+    el.querySelector('[data-x="c"]').onclick = closeOverlay;
+    $("#payuse", el).onclick = function () { closeOverlay(); startPayment(plan, pick); 
+    };
+  }
+
+  /* ---------- Manage Subscription: Free Trial (Upgrade) / Subscribed (Downgrade) ---------- */
+  function vSubscription() {
+    var free = st.user.plan === "free", h;
+    if (free) {
+      h = subhead("Manage Subscription") + '<section class="ld-panel sub2"><div class="sub2-top"><b>Free Trial</b></div><h2>USD 0</h2><p>You\'ve received free coins to explore LullaDream\'s features. Try creating stories and playing voice templates with your trial balance.</p>' +
+        '<ul><li>' + ic("check", 14) + "Play LullaDream's Voice Template</li><li>" + ic("check", 14) + 'Create Stories With AI Story Generator</li></ul><div class="sub2-exp"><small>Exp Date:</small><b>--</b></div>' +
+        '<div class="sub2-btns"><button class="ld-btn pill sub2-off" disabled>Unsubscribe</button><button class="ld-btn pill primary" data-act="toplans">Upgrade</button></div></section>';
+    } else {
+      var sp = st.user.plan === "super";
+      h = subhead("Manage Subscription") + '<section class="ld-panel sub2"><div class="sub2-top"><b>' + planName(st.user.plan) + '</b><span class="ld-badge orange">Yearly</span></div><h2>USD ' + (sp ? "112.00" : "23.76") + "</h2><p>" + (sp ? "Take storytelling to the next level with full creative control." : "Unlock the full story library and create magical bedtime stories for your child.") + "</p>" +
+        "<ul>" + (sp ? "<li>" + ic("check", 14) + "Includes all Premium features</li><li>" + ic("check", 14) + "Get 4800 coins to creating custom stories and voice cloning</li>" : "<li>" + ic("check", 14) + "Unlimited Bedtime Stories</li><li>" + ic("check", 14) + "Unlimited Voice Templates</li>") + '</ul><div class="sub2-exp"><small>Exp. date:</small><b>Tue, Mar 16 2027</b></div>' +
+        '<div class="sub2-btns"><button class="ld-btn pill cancel2" data-act="unsub">Unsubscribe</button><button class="ld-btn pill primary" data-act="toplans">Downgrade</button></div></section>';
+    }
+    return { active: "profile", title: "", html: h, doc: "Manage Subscription" };
+  }
+  Object.assign(A, {
+    toplans: function () { plansSt.sel = st.user.plan === "free" ? "super" : null; plansSt.agree = false; go("plans"); },
+    downgrade: function () { A.toplans(); },
+    unsub: function () { dialog({ art: '<div class="ic2 red">' + ic("card", 30) + "</div>", danger: true, title: "Unsubscribe?", text: "Your plan will return to the Free Trial. Demo only — nothing is charged.", ok: "Unsubscribe", onOk: function () { st.user.plan = "free"; save(); setTimeout(function () { keepScroll(render); }); toast("You've unsubscribed"); } }); }
+  });
+
+  /* ---------- Payment page (QRIS / Virtual Account) ---------- */
+  IMG.paySecure = "assets/pay-secure.png"; IMG.qris = "assets/qris-logo.png";
+  var payS = { plan: null, method: null, end: 0, t: null, ref: "" };
+  function planPrice(p) { return p.trial ? 0 : +p.now; }
+  function finishPlan(p, method) {
+    st.user.plan = p.id; var c = +p.feats.filter(function (f) { return /coins/.test(f[0]); })[0][0].replace(/\D/g, ""); st.coins += c; txAdd("sub", "Subscription", c); save();
+    plansSt.sel = null; plansSt.agree = false; clearInterval(payS.t); payS.plan = null;
+    toast((p.trial ? "Your 7-day free trial has started" : "Welcome to " + p.name) + " · paid with " + method); go("profile");
+  }
+  function startPayment(p, method) {
+    if (method === "QRIS" || /Virtual Account/.test(method)) {
+      payS = { plan: p, method: method, end: Date.now() + 24 * 3600e3 - 5000, t: null, ref: String(Date.now()).slice(-10) };
+      go("payment"); return;
+    }
+    progressSheet2('<img src="' + IMG.paySecure + '" alt="" style="width:64px">', "Processing Payment...", "Sit tight! We're activating your " + p.name + " plan ⏳", 2200, function () { finishPlan(p, method); });
+  }
+  function qrSvg(seed) {
+    var n = 33, cells = "", r = 0; function rnd() { r = (r * 9301 + 49297 + seed) % 233280; return r / 233280; }
+    function finder(x, y) { return '<rect x="' + x + '" y="' + y + '" width="7" height="7"/><rect x="' + (x + 1) + '" y="' + (y + 1) + '" width="5" height="5" fill="#fff"/><rect x="' + (x + 2) + '" y="' + (y + 2) + '" width="3" height="3"/>'; }
+    for (var y = 0; y < n; y++) for (var x = 0; x < n; x++) {
+      var inF = (x < 8 && y < 8) || (x > n - 9 && y < 8) || (x < 8 && y > n - 9); if (inF) continue;
+      if (rnd() > .52) cells += '<rect x="' + x + '" y="' + y + '" width="1" height="1"/>';
+    }
+    return '<svg viewBox="-2 -2 ' + (n + 4) + " " + (n + 4) + '" class="qr" shape-rendering="crispEdges" role="img" aria-label="QRIS payment code"><rect x="-2" y="-2" width="' + (n + 4) + '" height="' + (n + 4) + '" fill="#fff"/><g fill="#111">' + finder(0, 0) + finder(n - 7, 0) + finder(0, n - 7) + cells + "</g></svg>";
+  }
+  function vPayment() {
+    var p = payS.plan; if (!p) { setTimeout(function () { go("plans"); }); return { active: "profile", html: "" }; }
+    var qris = payS.method === "QRIS", amt = planPrice(p) === 0 ? "USD 0.00" : "USD " + (+p.now).toFixed(2);
+    var box = qris ? '<div class="pay3-box"><img class="pay3-qris" src="' + IMG.qris + '" alt="QRIS"><div class="pay3-qr" id="qrwrap">' + qrSvg(+payS.ref.slice(-4)) + '</div><a class="pay3-dl" data-act="qrdl">Download QR Code</a></div>'
+      : '<div class="pay3-box va"><b>' + esc(payS.method) + '</b><small>Virtual Account Number</small><div class="pay3-va"><strong>8808 ' + payS.ref.slice(0, 4) + " " + payS.ref.slice(4, 8) + " " + payS.ref.slice(8) + '</strong><button class="ld-btn soft sm" data-act="copyva">' + ic("doc", 14) + "Copy</button></div></div>";
+    var h = '<section class="pay3"><div class="pay3-main"><img class="pay3-ic" src="' + IMG.paySecure + '" alt=""><p class="pay3-lead">To complete the transaction process, please make payment before:</p><b class="pay3-time" id="paytime">--:--:--</b>' + box + "</div>" +
+      '<aside class="pay3-side"><div class="ld-panel pay3-sum"><div class="txd-row"><span>Amount:</span><b>' + amt + '</b></div><div class="txd-row"><span>Plan</span><b>' + esc(p.name) + " · " + (plansSt.cycle === "yearly" ? "Yearly" : "Monthly") + '</b></div><div class="txd-row"><span>Payment Method</span><b>' + esc(payS.method) + '</b></div><div class="txd-row"><span>Order ID</span><b>LD-' + payS.ref + '</b></div></div>' +
+      '<div class="pay3-foot"><button class="ld-btn pill cancel2" data-act="payhome">Home</button><button class="ld-btn pill primary" data-act="paycheck">Check Status</button></div></aside></section>';
+    return { active: "profile", title: "", html: h, doc: "Payment", after: function () {
+      clearInterval(payS.t);
+      function paint() { var e = $("#paytime"); if (!e) return clearInterval(payS.t); var s = Math.max(0, Math.floor((payS.end - Date.now()) / 1000)); e.textContent = [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map(function (v) { return ("0" + v).slice(-2); }).join(":"); }
+      paint(); payS.t = setInterval(paint, 1000);
+    } };
+  }
+  Object.assign(A, {
+    qrdl: function () {
+      var svg = $("#qrwrap svg"); if (!svg) return; var blob = new Blob([svg.outerHTML], { type: "image/svg+xml" }), a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = "lulladream-qris-" + payS.ref + ".svg"; document.body.appendChild(a); a.click(); a.remove(); toast("QR Code downloaded");
+    },
+    copyva: function () { var v = "8808" + payS.ref; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(function () { toast("Virtual Account number copied"); }, function () { toast(v); }); },
+    payhome: function () { toast("You can finish the payment later from Recent Activity"); go("home"); },
+    paycheck: function () {
+      var p = payS.plan, m = payS.method; if (!p) return;
+      progressSheet2('<img src="' + IMG.paySecure + '" alt="" style="width:64px">', "Checking Payment Status...", "Sit tight! We're confirming your payment ⏳", 1800, function () { finishPlan(p, m); });
+    }
+  });
+  var _routeExtra3 = routeExtra;
+  routeExtra = function (name) { if (name === "payment") return vPayment; return _routeExtra3(name); };
+  window.addEventListener("hashchange", function () { if (!/#\/payment/.test(location.hash)) clearInterval(payS.t); });
   function keepScroll(fn) { var y = window.scrollY, tr = $$(".track").map(function (t) { return t.scrollLeft; }); fn(); window.scrollTo(0, y); $$(".track").forEach(function (t, i) { t.scrollLeft = tr[i] || 0; }); }
 
   document.addEventListener("click", function (e) {
