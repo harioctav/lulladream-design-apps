@@ -583,16 +583,16 @@
     return { active: "profile", title: "", back: true, search: false, html: h, doc: "Coming Soon" };
   }
   /* ---- Top up (same design as the app) ---- */
-  var PACKS = [[100, 2.52], [300, 5.32], [500, 9.80], [800, 15.40], [1000, 1.00], [1500, 0.59]];
-  var topSel = 500;
+  var PACKS = [[100, 2.48], [300, 5.23], [500, 9.63], [800, 15.13], [1000, 18.98], [1500, 28.88]];
+  var topSel = null;
   function usd(n) { return "USD " + n.toFixed(2); }
   function vTopupOld() {
     var p = PACKS.filter(function (x) { return x[0] === topSel; })[0];
     var h = '<section class="tu2"><div class="tu2-main">' +
-      '<div class="tu2-card"><small>Your Coins</small><strong><i class="coin"></i>' + st.coins + ' Coins<button data-act="refreshcoins" aria-label="Refresh">' + ic("refresh", 22) + '</button></strong><em>' + planName(st.user.plan) + "</em></div>" +
+      '<div class="tu2-card"><small>Your Coins</small><strong><img class="tu2-ci" src="' + IMG.coins + '" alt="">' + st.coins + ' Coins<button data-act="refreshcoins" aria-label="Refresh">' + ic("refresh", 22) + '</button></strong><em>' + planName(st.user.plan) + "</em></div>" +
       '<h2 class="tu2-h">Select Number Of Coins</h2><div class="tu2-grid">' +
-      PACKS.map(function (x) { return '<button class="tu2-pack' + (x[0] === topSel ? " is-on" : "") + '" data-act="pack" data-v="' + x[0] + '"><b><i class="coin sm"></i>' + x[0] + " Coins</b><span>" + usd(x[1]) + "</span></button>"; }).join("") + "</div></div>" +
-      '<aside class="tu2-pay"><div class="tu2-total"><span>Total:</span><b>' + usd(p[1]) + '</b></div><button class="ld-btn primary lg block pill" data-act="buy">Select Payment</button></aside></section>';
+      PACKS.map(function (x) { return '<button class="tu2-pack' + (x[0] === topSel ? " is-on" : "") + '" data-act="pack" data-v="' + x[0] + '"><b><img class="tu2-ci sm" src="' + IMG.coins + '" alt="">' + x[0] + " Coins</b><span>" + usd(x[1]) + "</span></button>"; }).join("") + "</div></div>" +
+      '<aside class="tu2-pay">' + (p ? '<div class="tu2-total"><span>Total:</span><b>' + usd(p[1]) + "</b></div>" : "") + '<button class="ld-btn primary lg block pill" data-act="buy"' + (p ? "" : " disabled") + '>Select Payment</button></aside></section>';
     return { active: "profile", title: "Top Up Coins", back: true, search: false, html: h };
   }
   /* ================= Auth: welcome · sign in · sign up · forgot · OTP · new password ================= */
@@ -930,7 +930,7 @@
     topup: function () { go("topup"); },
     pack: function (el) { topSel = +el.getAttribute("data-v"); keepScroll(render); },
     refreshcoins: function () { toast("Balance is up to date"); },
-    buy: function () { var p = PACKS.filter(function (x) { return x[0] === topSel; })[0]; dialog({ icon: "topup", title: "Select Payment", text: p[0] + " Coins · Total " + usd(p[1]) + ". Demo: no payment is processed.", ok: "Pay " + usd(p[1]), onOk: function () { st.coins += p[0]; save(); setTimeout(function () { keepScroll(render); }); toast("+" + p[0] + " coins added"); } }); },
+    buy: function () { var p = PACKS.filter(function (x) { return x[0] === topSel; })[0]; if (!p) return; payMethods({ id: "topup", topup: p[0], name: p[0] + " Coins", now: p[1].toFixed(2), feats: [] }); },
     notify: function (el) { var k = el.getAttribute("data-k"); st.notifyMe = st.notifyMe || []; var i = st.notifyMe.indexOf(k); if (i > -1) st.notifyMe.splice(i, 1); else st.notifyMe.push(k); save(); keepScroll(render); toast(i > -1 ? "Notification turned off" : "We'll let you know when it's ready"); },
     lang: function () { choose("Language", [["EN", "English"], ["ID", "Bahasa Indonesia"]], st.user.lang, function (v) { st.user.lang = v; save(); keepScroll(render); toast(v === "ID" ? "Bahasa diubah ke Indonesia" : "Language set to English"); }); },
     plan: function (el) { var v = el.getAttribute("data-v"); dialog({ icon: "card", title: "Switch plan?", text: "Switch to " + planName(v) + ". This is a demo — nothing will be charged.", ok: "Switch", onOk: function () { st.user.plan = v; save(); setTimeout(render); toast("Plan changed to " + planName(v)); } }); },
@@ -1289,7 +1289,7 @@
   }
   function vSubscription() {
     var h = subhead("Manage Subscription") + '<section class="ld-panel sub2"><div class="sub2-top"><b>Super Premium</b><span class="ld-badge orange">Yearly</span></div><h2>USD 112.00</h2><p>Take storytelling to the next level with full creative control.</p>' +
-      '<ul><li>' + ic("check", 14) + 'Includes all Premium features</li><li>' + ic("check", 14) + 'Get 4800 coins to creating custom stories and voice cloning</li></ul><div class="sub2-exp"><small>Exp. date:</small><b>Tue, Mar 16 2027</b></div>' +
+      '<ul><li>' + ic("check", 14) + 'Includes all Premium features</li><li>' + ic("check", 14) + 'Get 4800 coins to creating custom stories and voice cloning</li></ul><div class="sub2-exp"><small>Exp. date:</small><b>Wed, Mar 17 2027</b></div>' +
       '<div class="sub2-btns"><button class="ld-btn pill cancel2" data-act="unsub">Unsubscribe</button><button class="ld-btn pill primary" data-act="downgrade">Downgrade</button></div></section>';
     return { active: "profile", title: "", html: h, doc: "Manage Subscription" };
   }
@@ -1476,7 +1476,7 @@
     },
     txrange: function () { },
     txtype: function (el) { TXF.type = el.getAttribute("data-v"); keepScroll(render); },
-    unsub: function () { dialog({ art: '<div class="ic2 red">' + ic("card", 30) + "</div>", danger: true, title: "Unsubscribe?", text: "You'll keep Super Premium benefits until Tue, Mar 16 2027. Demo only — nothing is charged.", ok: "Unsubscribe", onOk: function () { toast("Subscription will end on Mar 16 2027"); } }); },
+    unsub: function () { dialog({ art: '<div class="ic2 red">' + ic("card", 30) + "</div>", danger: true, title: "Unsubscribe?", text: "You'll keep Super Premium benefits until Wed, Mar 17 2027. Demo only — nothing is charged.", ok: "Unsubscribe", onOk: function () { toast("Subscription will end on Mar 16 2027"); } }); },
     downgrade: function () { dialog({ icon: "card", title: "Downgrade plan?", text: "Switch to Premium at your next billing date. Demo only — nothing is charged.", ok: "Downgrade", onOk: function () { st.user.plan = "premium"; save(); setTimeout(render); toast("Plan will change to Premium"); } }); },
     avatarpick: function () { toast("Photo upload is available in the app"); },
     delacc2: function () { st = seed(); save(); toast("Account deleted"); go("welcome"); },
@@ -1744,8 +1744,8 @@
       { id: "super", name: "Super Premium", off: 58, was: "9.35", now: "0.00", best: true, trial: "7-Day Free trial", then: "Then USD 3.85/month. Cancel anytime.", desc: "Take storytelling to the next level with full creative control.", feats: [["Includes", " all Premium features"], ["Get 400 coins", " to creating custom stories and voice cloning", true]] }
     ],
     yearly: [
-      { id: "premium", name: "Premium", off: 60, was: "59.40", now: "23.76", desc: "Unlock the full story library and create magical bedtime stories for your child.", feats: [["Unlimited", " Bedtime Stories"], ["Unlimited", " Voice Templates"], ["Get 1200 coins", " to create custom stories"]] },
-      { id: "super", name: "Super Premium", off: 58, was: "112.20", now: "0.00", best: true, trial: "7-Day Free trial", then: "Then USD 46.20/year. Cancel anytime.", desc: "Take storytelling to the next level with full creative control.", feats: [["Includes", " all Premium features"], ["Get 4800 coins", " to creating custom stories and voice cloning", true]] }
+      { id: "premium", name: "Premium", off: 54, was: "55.00", now: "25.30", desc: "Unlock the full story library and create magical bedtime stories for your child.", feats: [["Unlimited", " Bedtime Stories"], ["Unlimited", " Voice Templates"], ["Get 1200 coins", " to create custom stories"]] },
+      { id: "super", name: "Super Premium", off: 58, was: "110.00", now: "45.65", desc: "Take storytelling to the next level with full creative control.", feats: [["Includes", " all Premium features"], ["Get 4800 coins", " to creating custom stories and voice cloning", true]] }
     ]
   };
   function vPlans() {
@@ -1811,8 +1811,8 @@
         '<div class="sub2-btns"><button class="ld-btn pill sub2-off" disabled>Unsubscribe</button><button class="ld-btn pill primary" data-act="toplans">Upgrade</button></div></section>';
     } else {
       var sp = st.user.plan === "super";
-      h = subhead("Manage Subscription") + '<section class="ld-panel sub2"><div class="sub2-top"><b>' + planName(st.user.plan) + '</b><span class="ld-badge orange">Yearly</span></div><h2>USD ' + (sp ? "112.00" : "23.76") + "</h2><p>" + (sp ? "Take storytelling to the next level with full creative control." : "Unlock the full story library and create magical bedtime stories for your child.") + "</p>" +
-        "<ul>" + (sp ? "<li>" + ic("check", 14) + "Includes all Premium features</li><li>" + ic("check", 14) + "Get 4800 coins to creating custom stories and voice cloning</li>" : "<li>" + ic("check", 14) + "Unlimited Bedtime Stories</li><li>" + ic("check", 14) + "Unlimited Voice Templates</li>") + '</ul><div class="sub2-exp"><small>Exp. date:</small><b>Tue, Mar 16 2027</b></div>' +
+      h = subhead("Manage Subscription") + '<section class="ld-panel sub2"><div class="sub2-top"><b>' + planName(st.user.plan) + '</b><span class="ld-badge orange">Yearly</span></div><h2>USD ' + (sp ? "110.00" : "25.30") + "</h2><p>" + (sp ? "Take storytelling to the next level with full creative control." : "Unlock the full story library and create magical bedtime stories for your child.") + "</p>" +
+        "<ul>" + (sp ? "<li>" + ic("check", 14) + "Includes all Premium features</li><li>" + ic("check", 14) + "Get 4800 coins to creating custom stories and voice cloning</li>" : "<li>" + ic("check", 14) + "Unlimited Bedtime Stories</li><li>" + ic("check", 14) + "Unlimited Voice Templates</li>") + '</ul><div class="sub2-exp"><small>Exp. date:</small><b>Wed, Mar 17 2027</b></div>' +
         '<div class="sub2-btns"><button class="ld-btn pill cancel2" data-act="unsub">Unsubscribe</button><button class="ld-btn pill primary" data-act="toplans">Downgrade</button></div></section>';
     }
     return { active: "profile", title: "", html: h, doc: "Manage Subscription" };
@@ -1828,6 +1828,7 @@
   var payS = { plan: null, method: null, end: 0, t: null, ref: "" };
   function planPrice(p) { return p.trial ? 0 : +p.now; }
   function finishPlan(p, method) {
+    if (p.topup) { st.coins += p.topup; txAdd("topup", "Top Up", p.topup); save(); clearInterval(payS.t); payS.plan = null; topSel = null; toast("+" + p.topup + " coins added · paid with " + method); go("topup"); return; }
     st.user.plan = p.id; var c = +p.feats.filter(function (f) { return /coins/.test(f[0]); })[0][0].replace(/\D/g, ""); st.coins += c; txAdd("sub", "Subscription", c); save();
     plansSt.sel = null; plansSt.agree = false; clearInterval(payS.t); payS.plan = null;
     toast((p.trial ? "Your 7-day free trial has started" : "Welcome to " + p.name) + " · paid with " + method); go("profile");
@@ -1837,7 +1838,7 @@
       payS = { plan: p, method: method, end: Date.now() + 24 * 3600e3 - 5000, t: null, ref: String(Date.now()).slice(-10) };
       go("payment"); return;
     }
-    progressSheet2('<img src="' + IMG.paySecure + '" alt="" style="width:64px">', "Processing Payment...", "Sit tight! We're activating your " + p.name + " plan ⏳", 2200, function () { finishPlan(p, method); });
+    progressSheet2('<img src="' + IMG.paySecure + '" alt="" style="width:64px">', "Processing Payment...", (p.topup ? "Sit tight! We're adding your coins ⏳" : "Sit tight! We're activating your " + p.name + " plan ⏳"), 2200, function () { finishPlan(p, method); });
   }
   function qrSvg(seed) {
     var n = 33, cells = "", r = 0; function rnd() { r = (r * 9301 + 49297 + seed) % 233280; return r / 233280; }
@@ -1854,7 +1855,7 @@
     var box = qris ? '<div class="pay3-box"><img class="pay3-qris" src="' + IMG.qris + '" alt="QRIS"><div class="pay3-qr" id="qrwrap">' + qrSvg(+payS.ref.slice(-4)) + '</div><a class="pay3-dl" data-act="qrdl">Download QR Code</a></div>'
       : '<div class="pay3-box va"><b>' + esc(payS.method) + '</b><small>Virtual Account Number</small><div class="pay3-va"><strong>8808 ' + payS.ref.slice(0, 4) + " " + payS.ref.slice(4, 8) + " " + payS.ref.slice(8) + '</strong><button class="ld-btn soft sm" data-act="copyva">' + ic("doc", 14) + "Copy</button></div></div>";
     var h = '<section class="pay3"><div class="pay3-main"><img class="pay3-ic" src="' + IMG.paySecure + '" alt=""><p class="pay3-lead">To complete the transaction process, please make payment before:</p><b class="pay3-time" id="paytime">--:--:--</b>' + box + "</div>" +
-      '<aside class="pay3-side"><div class="ld-panel pay3-sum"><div class="txd-row"><span>Amount:</span><b>' + amt + '</b></div><div class="txd-row"><span>Plan</span><b>' + esc(p.name) + " · " + (plansSt.cycle === "yearly" ? "Yearly" : "Monthly") + '</b></div><div class="txd-row"><span>Payment Method</span><b>' + esc(payS.method) + '</b></div><div class="txd-row"><span>Order ID</span><b>LD-' + payS.ref + '</b></div></div>' +
+      '<aside class="pay3-side"><div class="ld-panel pay3-sum"><div class="txd-row"><span>Amount:</span><b>' + amt + '</b></div><div class="txd-row"><span>Plan</span><b>' + (p.topup ? "Top Up · " + esc(p.name) : esc(p.name) + " · " + (plansSt.cycle === "yearly" ? "Yearly" : "Monthly")) + '</b></div><div class="txd-row"><span>Payment Method</span><b>' + esc(payS.method) + '</b></div><div class="txd-row"><span>Order ID</span><b>LD-' + payS.ref + '</b></div></div>' +
       '<div class="pay3-foot"><button class="ld-btn pill cancel2" data-act="payhome">Home</button><button class="ld-btn pill primary" data-act="paycheck">Check Status</button></div></aside></section>';
     return { active: "profile", title: "", html: h, doc: "Payment", after: function () {
       clearInterval(payS.t);
